@@ -3,6 +3,9 @@ import { useSession } from "./lib/auth-client";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
+import ClientsPage from "./pages/ClientsPage";
+import InvoicesPage from "./pages/InvoicesPage";
+import InvoiceNewPage from "./pages/InvoiceNewPage";
 import AppLayout from "./components/AppLayout";
 
 // Wraps any route that requires auth
@@ -42,7 +45,9 @@ export default function App() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        {/* More routes will be added in Week 2+ */}
+        <Route path="clients" element={<ClientsPage />} />
+        <Route path="invoices" element={<InvoicesPage />} />
+        <Route path="invoices/new" element={<InvoiceNewPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
