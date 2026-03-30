@@ -6,6 +6,8 @@ import DashboardPage from "./pages/DashboardPage";
 import ClientsPage from "./pages/ClientsPage";
 import InvoicesPage from "./pages/InvoicesPage";
 import InvoiceNewPage from "./pages/InvoiceNewPage";
+import InvoiceDetailPage from "./pages/InvoiceDetailPage";
+import PortalPage from "./pages/PortalPage";
 import AppLayout from "./components/AppLayout";
 
 // Wraps any route that requires auth
@@ -30,9 +32,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
-      {/* Public auth routes */}
+      {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/portal/:token" element={<PortalPage />} />
 
       {/* Protected app routes */}
       <Route
@@ -48,6 +51,7 @@ export default function App() {
         <Route path="clients" element={<ClientsPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="invoices/new" element={<InvoiceNewPage />} />
+        <Route path="invoices/:id" element={<InvoiceDetailPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

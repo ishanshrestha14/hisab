@@ -6,6 +6,7 @@ import {
   updateInvoiceSchema,
   updateInvoiceStatusSchema,
 } from "@hisab/shared";
+import { getNPRRate } from "../lib/exchange-rate";
 const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
@@ -33,10 +34,29 @@ invoices.get("/:id", async (c) => {
   const { id } = c.req.param();
   const invoice = await prisma.invoice.findFirst({
     where: { id, userId: user.id },
-    include: { client: true, lineItems: true },
+    include: {
+      client: { select: { name: true, email: true, company: true, country: true } },
+      lineItems: true,
+    },
   });
   if (!invoice) return c.json({ error: "Not found" }, 404);
-  return c.json(invoice);
+
+  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  let nprRate: number | null = null;
+  if (invoice.currency !== "NPR") {
+    nprRate = await getNPRRate(
+      invoice.currency as "USD" | "GBP" | "EUR",
+      user.id
+    ).catch(() => null);
+  }
+
+  return c.json({
+    ...invoice,
+    total,
+    nprRate,
+    nprTotal: nprRate ? total * nprRate : null,
+    freelancer: { name: user.name, email: user.email },
+  });
 });
 
 // POST /api/invoices

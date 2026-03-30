@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
@@ -33,6 +33,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
@@ -132,7 +133,8 @@ export default function InvoicesPage() {
                 return (
                   <tr
                     key={inv.id}
-                    className="border-b border-border last:border-0 hover:bg-accent/50"
+                    onClick={() => navigate(`/invoices/${inv.id}`)}
+                    className="cursor-pointer border-b border-border last:border-0 hover:bg-accent/50"
                   >
                     <td className="px-6 py-3 font-medium text-foreground">
                       {inv.number}
