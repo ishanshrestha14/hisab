@@ -78,3 +78,21 @@ Key: `Invoice.token` is the public cuid used for `/portal/:token` — never expo
 See `.env.example` at root. Copy to `.env` before running.
 Required for Week 1: `DATABASE_URL`, `BETTER_AUTH_SECRET`
 Optional for Week 1: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+
+## Roadmap
+
+| Week | Focus |
+|------|-------|
+| 1 ✅ | Monorepo init, Prisma schema + migrations, Better Auth (email + Google), login/signup UI |
+| 2    | Client CRUD (API + UI), Invoice creation form with live totals, auto invoice numbering |
+| 3    | Invoice list + status tabs, NPR conversion (exchangerate.host + DB cache), dashboard stats |
+| 4    | Client portal (public `/portal/:token`), PDF export, "Mark as Paid" flow |
+| 5    | Resend email (send invoice, reminder, paid notification), overdue cron job, polish |
+| 6    | Docker + docker-compose, README, `.env.example`, Vercel + Railway deploy, GitHub launch |
+
+### Key decisions
+- `packages/ui` — shadcn components installed once, shared across apps (future-proofing)
+- `packages/shared` — Zod schemas defined once, imported in both API (validation) and web (form types)
+- `tsx` for running TypeScript in the API during dev
+- `date-fns` for date math (due dates, overdue detection)
+- Email (Resend) ships in Week 5 so Week 6 is purely infra + launch prep
