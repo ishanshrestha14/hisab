@@ -8,6 +8,8 @@ interface DashboardStats {
   totalPaid: number;
   totalOutstanding: number;
   overdueCount: number;
+  totalPaidNPR: number;
+  nprRates: Record<string, number>;
   recentInvoices: {
     id: string;
     number: string;
@@ -15,6 +17,7 @@ interface DashboardStats {
     currency: string;
     total: number;
     dueDate: string;
+    clientName: string;
   }[];
 }
 
@@ -42,6 +45,9 @@ export default function DashboardPage() {
     {
       label: "Total Paid",
       value: data ? formatCurrency(data.totalPaid, "USD") : "—",
+      sub: data?.totalPaidNPR
+        ? `≈ ${formatCurrency(data.totalPaidNPR, "NPR")}`
+        : undefined,
       icon: TrendingUp,
       color: "text-green-600",
       bg: "bg-green-100 dark:bg-green-900/20",
@@ -73,11 +79,8 @@ export default function DashboardPage() {
 
       {/* Stats cards */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon, color, bg }) => (
-          <div
-            key={label}
-            className="rounded-lg border border-border bg-card p-5"
-          >
+        {stats.map(({ label, value, sub, icon: Icon, color, bg }) => (
+          <div key={label} className="rounded-lg border border-border bg-card p-5">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{label}</p>
               <div className={`rounded-md p-2 ${bg}`}>
@@ -91,23 +94,37 @@ export default function DashboardPage() {
                 value
               )}
             </p>
+            {sub && !isLoading && (
+              <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
+            )}
           </div>
         ))}
       </div>
 
+      {/* NPR rates strip */}
+      {data?.nprRates && (
+        <div className="mb-8 flex flex-wrap gap-4 rounded-lg border border-border bg-card px-6 py-3">
+          <span className="text-xs font-medium text-muted-foreground self-center">
+            Today's rates (NPR):
+          </span>
+          {Object.entries(data.nprRates).map(([currency, rate]) => (
+            <span key={currency} className="text-xs text-foreground">
+              1 {currency} = <span className="font-medium">₨{rate.toFixed(2)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Recent invoices */}
       <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-6 py-4">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="font-medium text-foreground">Recent Invoices</h2>
         </div>
 
         {isLoading ? (
           <div className="space-y-3 p-6">
             {[...Array(3)].map((_, i) => (
-              <div
-                key={i}
-                className="h-10 animate-pulse rounded bg-muted"
-              />
+              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
             ))}
           </div>
         ) : !data?.recentInvoices.length ? (
@@ -122,6 +139,7 @@ export default function DashboardPage() {
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-6 py-3 font-medium">Invoice</th>
+                <th className="px-6 py-3 font-medium">Client</th>
                 <th className="px-6 py-3 font-medium">Status</th>
                 <th className="px-6 py-3 font-medium">Due</th>
                 <th className="px-6 py-3 text-right font-medium">Amount</th>
@@ -135,6 +153,9 @@ export default function DashboardPage() {
                 >
                   <td className="px-6 py-3 font-medium text-foreground">
                     {inv.number}
+                  </td>
+                  <td className="px-6 py-3 text-muted-foreground">
+                    {inv.clientName}
                   </td>
                   <td className="px-6 py-3">
                     <span

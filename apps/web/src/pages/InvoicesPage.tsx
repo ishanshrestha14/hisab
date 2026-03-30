@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Plus } from "lucide-react";
@@ -14,6 +15,16 @@ interface Invoice {
   lineItems: { total: number }[];
 }
 
+type FilterTab = "ALL" | "DRAFT" | "SENT" | "PAID" | "OVERDUE";
+
+const TABS: { label: string; value: FilterTab }[] = [
+  { label: "All", value: "ALL" },
+  { label: "Draft", value: "DRAFT" },
+  { label: "Sent", value: "SENT" },
+  { label: "Paid", value: "PAID" },
+  { label: "Overdue", value: "OVERDUE" },
+];
+
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-muted text-muted-foreground",
   SENT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -22,10 +33,15 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
+  const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
+
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["invoices"],
     queryFn: () => api.get("/api/invoices"),
   });
+
+  const filtered =
+    activeTab === "ALL" ? invoices : invoices.filter((inv) => inv.status === activeTab);
 
   return (
     <div className="p-8">
@@ -45,6 +61,39 @@ export default function InvoicesPage() {
         </Link>
       </div>
 
+      {/* Status filter tabs */}
+      <div className="mb-4 flex gap-1 border-b border-border">
+        {TABS.map((tab) => {
+          const count =
+            tab.value === "ALL"
+              ? invoices.length
+              : invoices.filter((inv) => inv.status === tab.value).length;
+
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                activeTab === tab.value
+                  ? "border-brand text-brand"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-xs ${
+                  activeTab === tab.value
+                    ? "bg-brand/10 text-brand"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
           <div className="space-y-3 p-6">
@@ -52,15 +101,19 @@ export default function InvoicesPage() {
               <div key={i} className="h-10 animate-pulse rounded bg-muted" />
             ))}
           </div>
-        ) : invoices.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="text-sm text-muted-foreground">No invoices yet.</p>
-            <Link
-              to="/invoices/new"
-              className="mt-2 inline-block text-sm text-brand hover:underline"
-            >
-              Create your first invoice
-            </Link>
+            <p className="text-sm text-muted-foreground">
+              {activeTab === "ALL" ? "No invoices yet." : `No ${activeTab.toLowerCase()} invoices.`}
+            </p>
+            {activeTab === "ALL" && (
+              <Link
+                to="/invoices/new"
+                className="mt-2 inline-block text-sm text-brand hover:underline"
+              >
+                Create your first invoice
+              </Link>
+            )}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -74,7 +127,7 @@ export default function InvoicesPage() {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv) => {
+              {filtered.map((inv) => {
                 const total = inv.lineItems.reduce((sum, li) => sum + li.total, 0);
                 return (
                   <tr
