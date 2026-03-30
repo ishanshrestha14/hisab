@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Currency {
+  USD
+  GBP
+  EUR
+  NPR
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+}
+
+// ─── Better Auth required tables ──────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  accounts      Account[]
+
+  clients       Client[]
+  invoices      Invoice[]
+
+  // Exchange rate cache per user is global — stored separately
+  exchangeRates ExchangeRate[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+}
+
+// ─── App models ───────────────────────────────────────────────────────────────
+
+model Client {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  email           String
+  company         String?
+  country         String?
+  defaultCurrency Currency  @default(USD)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  userId      String
+  clientId    String
+  // Public token for /portal/:token — never expose the real id
+  token       String        @unique @default(cuid())
+  number      String        // e.g. "INV-0001"
+  status      InvoiceStatus @default(DRAFT)
+  currency    Currency      @default(USD)
+  issueDate   DateTime      @default(now())
+  dueDate     DateTime
+  notes       String?
+  // Cached NPR rate at the time of sending — stored so PDF always shows original rate
+  nprRate     Float?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client    Client     @relation(fields: [clientId], references: [id])
+  lineItems LineItem[]
+}
+
+model LineItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Float
+  unitPrice   Float
+  // total = quantity * unitPrice (computed but stored for query efficiency)
+  total       Float
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ─── Exchange rate cache ───────────────────────────────────────────────────────
+// One row per base currency per day — fetched from exchangerate.host
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  userId    String
+  base      Currency
+  rateToNPR Float    // 1 base = X NPR
+  fetchedAt DateTime @default(now())
+  date      String   // "YYYY-MM-DD" — used as cache key
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([base, date])
+}
