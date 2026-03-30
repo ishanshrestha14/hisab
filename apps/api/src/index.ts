@@ -6,6 +6,7 @@ import { auth } from "./lib/auth";
 import { requireAuth } from "./middleware/auth.middleware";
 import clients from "./routes/clients";
 import dashboard from "./routes/dashboard";
+import invoices from "./routes/invoices";
 
 const app = new Hono();
 
@@ -36,6 +37,9 @@ app.route("/api/clients", clients);
 
 app.use("/api/dashboard/*", requireAuth);
 app.route("/api/dashboard", dashboard);
+
+app.use("/api/invoices/*", requireAuth);
+app.route("/api/invoices", invoices);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
