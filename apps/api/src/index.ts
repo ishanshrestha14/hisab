@@ -59,6 +59,5 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 const PORT = Number(process.env.PORT ?? 3001);
 
 serve({ fetch: app.fetch, port: PORT }, () => {
-  console.log(`🚀 API running at http://localhost:${PORT}`);
   startCronJobs();
 });

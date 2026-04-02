@@ -6,7 +6,6 @@ import { sendOverdueReminderEmail } from "./email";
 // Finds SENT invoices past their due date, marks them OVERDUE, emails the freelancer
 export function startCronJobs() {
   cron.schedule("0 8 * * *", async () => {
-
     const overdue = await prisma.invoice.findMany({
       where: {
         status: "SENT",
@@ -19,10 +18,7 @@ export function startCronJobs() {
       },
     });
 
-    if (overdue.length === 0) {
-      return;
-    }
-
+    if (overdue.length === 0) return;
 
     await prisma.invoice.updateMany({
       where: { id: { in: overdue.map((inv) => inv.id) } },
@@ -42,9 +38,7 @@ export function startCronJobs() {
         currency: invoice.currency,
         dueDate: invoice.dueDate,
         portalUrl,
-      }).catch((err) =>
-      );
+      }).catch(() => {});
     }
   });
-
 }

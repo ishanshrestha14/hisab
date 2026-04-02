@@ -63,8 +63,8 @@ portal.post("/:token/mark-paid", async (c) => {
   });
   if (!invoice) return c.json({ error: "Invoice not found" }, 404);
 
-  if (invoice.status === "PAID") {
-    return c.json({ error: "Invoice is already marked as paid" }, 400);
+  if (invoice.status !== "SENT") {
+    return c.json({ error: "Only sent invoices can be marked as paid" }, 400);
   }
 
   const updated = await prisma.invoice.update({
