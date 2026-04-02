@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import { Copy, Check, Download, ArrowLeft } from "lucide-react";
+import { Copy, Check, Download, ArrowLeft, Send } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { InvoicePDF, type InvoicePDFProps } from "@/components/InvoicePDF";
@@ -38,6 +38,14 @@ export default function InvoiceDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    },
+  });
+
+  const sendInvoice = useMutation({
+    mutationFn: () => api.post(`/api/invoices/${id}/send`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
   });
 
@@ -120,11 +128,12 @@ export default function InvoiceDetailPage() {
             </span>
             {invoice.status === "DRAFT" && (
               <button
-                onClick={() => updateStatus.mutate("SENT")}
-                disabled={updateStatus.isPending}
-                className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+                onClick={() => sendInvoice.mutate()}
+                disabled={sendInvoice.isPending}
+                className="flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-60"
               >
-                Mark as Sent
+                <Send size={12} />
+                {sendInvoice.isPending ? "Sending…" : "Send to Client"}
               </button>
             )}
           </div>

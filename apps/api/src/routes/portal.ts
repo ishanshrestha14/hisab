@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "@hisab/db";
 import { getNPRRate } from "../lib/exchange-rate";
+import { sendPaidNotificationEmail } from "../lib/email";
 
 const portal = new Hono();
 
@@ -52,7 +53,14 @@ portal.get("/:token", async (c) => {
 portal.post("/:token/mark-paid", async (c) => {
   const { token } = c.req.param();
 
-  const invoice = await prisma.invoice.findUnique({ where: { token } });
+  const invoice = await prisma.invoice.findUnique({
+    where: { token },
+    include: {
+      user: { select: { name: true, email: true } },
+      client: { select: { name: true } },
+      lineItems: true,
+    },
+  });
   if (!invoice) return c.json({ error: "Invoice not found" }, 404);
 
   if (invoice.status === "PAID") {
@@ -63,6 +71,17 @@ portal.post("/:token/mark-paid", async (c) => {
     where: { token },
     data: { status: "PAID" },
   });
+
+  // Notify the freelancer — best-effort, don't fail the request if email fails
+  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  sendPaidNotificationEmail({
+    to: invoice.user.email,
+    freelancerName: invoice.user.name,
+    clientName: invoice.client.name,
+    invoiceNumber: invoice.number,
+    total,
+    currency: invoice.currency,
+  }).catch((err) => console.error("Failed to send paid notification:", err));
 
   return c.json({ status: updated.status });
 });

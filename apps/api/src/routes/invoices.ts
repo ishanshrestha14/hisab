@@ -7,6 +7,8 @@ import {
   updateInvoiceStatusSchema,
 } from "@hisab/shared";
 import { getNPRRate } from "../lib/exchange-rate";
+import { sendInvoiceEmail } from "../lib/email";
+
 const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
@@ -142,6 +144,45 @@ invoices.patch(
     return c.json(invoice);
   }
 );
+
+// POST /api/invoices/:id/send — email invoice link to client, mark as SENT
+invoices.post("/:id/send", async (c) => {
+  const user = c.get("user");
+  const { id } = c.req.param();
+
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, userId: user.id },
+    include: {
+      client: { select: { name: true, email: true } },
+      lineItems: true,
+    },
+  });
+  if (!invoice) return c.json({ error: "Not found" }, 404);
+  if (invoice.status === "PAID") {
+    return c.json({ error: "Cannot send a paid invoice" }, 400);
+  }
+
+  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  const portalUrl = `${process.env.WEB_URL}/portal/${invoice.token}`;
+
+  await sendInvoiceEmail({
+    to: invoice.client.email,
+    clientName: invoice.client.name,
+    freelancerName: user.name,
+    invoiceNumber: invoice.number,
+    total,
+    currency: invoice.currency,
+    dueDate: invoice.dueDate,
+    portalUrl,
+  });
+
+  const updated = await prisma.invoice.update({
+    where: { id },
+    data: { status: "SENT" },
+  });
+
+  return c.json({ status: updated.status });
+});
 
 // DELETE /api/invoices/:id
 invoices.delete("/:id", async (c) => {
