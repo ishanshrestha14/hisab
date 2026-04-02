@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { auth } from "./lib/auth";
+import { startCronJobs } from "./lib/cron";
 import { requireAuth } from "./middleware/auth.middleware";
 import clients from "./routes/clients";
 import dashboard from "./routes/dashboard";
@@ -59,4 +60,5 @@ const PORT = Number(process.env.PORT ?? 3001);
 
 serve({ fetch: app.fetch, port: PORT }, () => {
   console.log(`🚀 API running at http://localhost:${PORT}`);
+  startCronJobs();
 });
