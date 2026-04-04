@@ -10,3 +10,5 @@ packages/db/prisma/migrations/*.lock
 
 # OS
 .DS_Store
+
+.claude/
