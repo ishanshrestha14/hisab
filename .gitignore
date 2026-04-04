@@ -12,3 +12,5 @@ packages/db/prisma/migrations/*.lock
 .DS_Store
 
 .claude/
+.mcp.json
+CLAUDE.md

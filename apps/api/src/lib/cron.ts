@@ -5,40 +5,50 @@ import { sendOverdueReminderEmail } from "./email";
 // Runs every day at 08:00 UTC
 // Finds SENT invoices past their due date, marks them OVERDUE, emails the freelancer
 export function startCronJobs() {
+  // Runs every day at 08:00 UTC
+  // Finds SENT invoices past their due date, marks them OVERDUE, emails the freelancer
   cron.schedule("0 8 * * *", async () => {
-    const overdue = await prisma.invoice.findMany({
-      where: {
-        status: "SENT",
-        dueDate: { lt: new Date() },
-      },
-      include: {
-        user: { select: { name: true, email: true } },
-        client: { select: { name: true } },
-        lineItems: true,
-      },
-    });
+    try {
+      const overdue = await prisma.invoice.findMany({
+        where: {
+          status: "SENT",
+          dueDate: { lt: new Date() },
+        },
+        include: {
+          user: { select: { name: true, email: true } },
+          client: { select: { name: true } },
+          lineItems: true,
+        },
+      });
 
-    if (overdue.length === 0) return;
+      if (overdue.length === 0) return;
 
-    await prisma.invoice.updateMany({
-      where: { id: { in: overdue.map((inv) => inv.id) } },
-      data: { status: "OVERDUE" },
-    });
+      await prisma.invoice.updateMany({
+        where: { id: { in: overdue.map((inv) => inv.id) } },
+        data: { status: "OVERDUE" },
+      });
 
-    for (const invoice of overdue) {
-      const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
-      const portalUrl = `${process.env.WEB_URL}/portal/${invoice.token}`;
+      console.log(`[cron:overdue] Marked ${overdue.length} invoice(s) as OVERDUE`);
 
-      sendOverdueReminderEmail({
-        to: invoice.user.email,
-        freelancerName: invoice.user.name,
-        clientName: invoice.client.name,
-        invoiceNumber: invoice.number,
-        total,
-        currency: invoice.currency,
-        dueDate: invoice.dueDate,
-        portalUrl,
-      }).catch(() => {});
+      for (const invoice of overdue) {
+        const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+        const portalUrl = `${process.env.WEB_URL}/portal/${invoice.token}`;
+
+        sendOverdueReminderEmail({
+          to: invoice.user.email,
+          freelancerName: invoice.user.name,
+          clientName: invoice.client.name,
+          invoiceNumber: invoice.number,
+          total,
+          currency: invoice.currency,
+          dueDate: invoice.dueDate,
+          portalUrl,
+        }).catch((err) =>
+          console.error(`[cron:overdue] Failed to email for ${invoice.number}:`, err)
+        );
+      }
+    } catch (err) {
+      console.error("[cron:overdue] Job failed:", err);
     }
   });
 }
