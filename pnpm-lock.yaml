@@ -54,6 +54,9 @@ importers:
       '@types/node-cron':
         specifier: ^3.0.11
         version: 3.0.11
+      esbuild:
+        specifier: ^0.27.4
+        version: 0.27.4
       tsx:
         specifier: ^4.19.2
         version: 4.21.0
