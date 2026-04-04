@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { env } from "./lib/env";
 import { auth } from "./lib/auth";
 import { startCronJobs } from "./lib/cron";
 import { requireAuth } from "./middleware/auth.middleware";
@@ -19,7 +20,7 @@ app.use(logger());
 
 app.use(
   cors({
-    origin: process.env.WEB_URL ?? "http://localhost:5173",
+    origin: env.WEB_URL,
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true, // required for Better Auth cookies
@@ -56,7 +57,7 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 
-const PORT = Number(process.env.PORT ?? 3001);
+const PORT = env.PORT;
 
 serve({ fetch: app.fetch, port: PORT }, () => {
   startCronJobs();
