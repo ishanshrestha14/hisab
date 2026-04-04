@@ -103,6 +103,8 @@ model Client {
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   invoices Invoice[]
+
+  @@index([userId])
 }
 
 model Invoice {
@@ -125,6 +127,11 @@ model Invoice {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   client    Client     @relation(fields: [clientId], references: [id])
   lineItems LineItem[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([clientId])
+  @@index([dueDate, status])
 }
 
 model LineItem {
@@ -137,6 +144,8 @@ model LineItem {
   total       Float
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
 }
 
 // ─── Exchange rate cache ───────────────────────────────────────────────────────
