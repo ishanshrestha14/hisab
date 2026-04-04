@@ -162,10 +162,16 @@ invoices.post("/:id/send", async (c) => {
     return c.json({ error: "Cannot send a paid invoice" }, 400);
   }
 
+  // Update status FIRST — email is best-effort, don't let email failure block the status change
+  const updated = await prisma.invoice.update({
+    where: { id },
+    data: { status: "SENT" },
+  });
+
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
   const portalUrl = `${process.env.WEB_URL}/portal/${invoice.token}`;
 
-  await sendInvoiceEmail({
+  sendInvoiceEmail({
     to: invoice.client.email,
     clientName: invoice.client.name,
     freelancerName: user.name,
@@ -174,12 +180,7 @@ invoices.post("/:id/send", async (c) => {
     currency: invoice.currency,
     dueDate: invoice.dueDate,
     portalUrl,
-  });
-
-  const updated = await prisma.invoice.update({
-    where: { id },
-    data: { status: "SENT" },
-  });
+  }).catch((err) => console.error("Failed to send invoice email:", err));
 
   return c.json({ status: updated.status });
 });
