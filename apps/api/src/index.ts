@@ -5,6 +5,7 @@ import { logger } from "hono/logger";
 import { env } from "./lib/env";
 import { auth } from "./lib/auth";
 import { startCronJobs } from "./lib/cron";
+import { registerListeners } from "./lib/listeners";
 import { requireAuth } from "./middleware/auth.middleware";
 import clients from "./routes/clients";
 import dashboard from "./routes/dashboard";
@@ -60,5 +61,6 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 const PORT = env.PORT;
 
 serve({ fetch: app.fetch, port: PORT }, () => {
+  registerListeners();
   startCronJobs();
 });

@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { rateLimiter } from "hono-rate-limiter";
 import { prisma } from "@hisab/db";
 import { getNPRRate } from "../lib/exchange-rate";
-import { sendPaidNotificationEmail } from "../lib/email";
+import { eventBus } from "../lib/events";
 import { apiError } from "../lib/errors";
 
 const keyFromIP = (c: Context) =>
@@ -93,16 +93,16 @@ portal.post("/:token/mark-paid", markPaidLimiter, async (c) => {
     data: { status: "PAID" },
   });
 
-  // Notify the freelancer — best-effort, don't fail the request if email fails
+  // Notify the freelancer via event bus — fire-and-forget, decoupled from email impl
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
-  sendPaidNotificationEmail({
+  eventBus.emit("invoice.paid", {
     to: invoice.user.email,
     freelancerName: invoice.user.name,
     clientName: invoice.client.name,
     invoiceNumber: invoice.number,
     total,
     currency: invoice.currency,
-  }).catch((err) => console.error("Failed to send paid notification:", err));
+  });
 
   return c.json({ status: updated.status });
 });

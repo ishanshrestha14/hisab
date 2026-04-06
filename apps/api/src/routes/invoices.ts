@@ -7,7 +7,7 @@ import {
   updateInvoiceStatusSchema,
 } from "@hisab/shared";
 import { getNPRRate } from "../lib/exchange-rate";
-import { sendInvoiceEmail } from "../lib/email";
+import { eventBus } from "../lib/events";
 import { apiError } from "../lib/errors";
 import { audit } from "../lib/audit";
 import { idempotencyMiddleware } from "../middleware/idempotency.middleware";
@@ -221,7 +221,7 @@ invoices.post("/:id/send", async (c) => {
     after: { status: "SENT" },
   });
 
-  sendInvoiceEmail({
+  eventBus.emit("invoice.sent", {
     to: invoice.client.email,
     clientName: invoice.client.name,
     freelancerName: user.name,
@@ -230,7 +230,7 @@ invoices.post("/:id/send", async (c) => {
     currency: invoice.currency,
     dueDate: invoice.dueDate,
     portalUrl,
-  }).catch((err) => console.error("Failed to send invoice email:", err));
+  });
 
   return c.json({ status: updated.status });
 });
