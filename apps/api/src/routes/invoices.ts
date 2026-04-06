@@ -10,6 +10,7 @@ import { getNPRRate } from "../lib/exchange-rate";
 import { sendInvoiceEmail } from "../lib/email";
 import { apiError } from "../lib/errors";
 import { audit } from "../lib/audit";
+import { idempotencyMiddleware } from "../middleware/idempotency.middleware";
 
 const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
@@ -73,7 +74,7 @@ invoices.get("/:id", async (c) => {
 });
 
 // POST /api/invoices
-invoices.post("/", zValidator("json", createInvoiceSchema), async (c) => {
+invoices.post("/", idempotencyMiddleware, zValidator("json", createInvoiceSchema), async (c) => {
   const user = c.get("user");
   const { lineItems, ...body } = c.req.valid("json");
 

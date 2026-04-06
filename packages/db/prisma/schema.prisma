@@ -37,9 +37,10 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  clients       Client[]
-  invoices      Invoice[]
-  auditLogs     AuditLog[]
+  clients          Client[]
+  invoices         Invoice[]
+  auditLogs        AuditLog[]
+  idempotencyKeys  IdempotencyKey[]
 
   // Exchange rate cache per user is global — stored separately
   exchangeRates ExchangeRate[]
@@ -167,6 +168,23 @@ model AuditLog {
   @@index([userId, entityType])
   @@index([entityId])
   @@index([createdAt])
+}
+
+// ─── Idempotency keys ─────────────────────────────────────────────────────────
+// Caches POST /api/invoices responses for 24h so duplicate submissions are safe.
+
+model IdempotencyKey {
+  id         String   @id @default(cuid())
+  key        String
+  userId     String
+  statusCode Int
+  response   Json
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([key, userId])
+  @@index([createdAt]) // used by a future cleanup job to prune expired keys
 }
 
 // ─── Exchange rate cache ───────────────────────────────────────────────────────
