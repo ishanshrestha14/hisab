@@ -139,10 +139,11 @@ function LineItemsTable({
 export default function InvoiceNewPage() {
   const navigate = useNavigate();
 
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["clients"],
-    queryFn: () => api.get("/api/clients"),
+  const { data: clientsData } = useQuery<{ data: Client[] }>({
+    queryKey: ["clients", 1],
+    queryFn: () => api.get("/api/clients?page=1&limit=100"),
   });
+  const clients = clientsData?.data ?? [];
 
   const {
     register,

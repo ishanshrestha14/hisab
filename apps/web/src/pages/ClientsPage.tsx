@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import {
   createClientSchema,
@@ -19,14 +19,23 @@ interface Client {
   defaultCurrency: Currency;
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 const CURRENCIES = ["USD", "GBP", "EUR", "NPR"] as const;
 
 function ClientDialog({
   client,
   onClose,
+  onSaved,
 }: {
   client?: Client;
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   const queryClient = useQueryClient();
   const isEdit = !!client;
@@ -55,6 +64,7 @@ function ClientDialog({
         : api.post("/api/clients", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      onSaved?.();
       onClose();
     },
   });
@@ -147,17 +157,22 @@ export default function ClientsPage() {
   const queryClient = useQueryClient();
   const [dialogClient, setDialogClient] = useState<Client | null | "new">(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
-  const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ["clients"],
-    queryFn: () => api.get("/api/clients"),
+  const { data, isLoading } = useQuery<{ data: Client[]; pagination: Pagination }>({
+    queryKey: ["clients", page],
+    queryFn: () => api.get(`/api/clients?page=${page}&limit=20`),
   });
+
+  const clients = data?.data ?? [];
+  const pagination = data?.pagination;
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/clients/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       setDeletingId(null);
+      setPage(1);
     },
   });
 
@@ -186,7 +201,7 @@ export default function ClientsPage() {
               <div key={i} className="h-10 animate-pulse rounded bg-muted" />
             ))}
           </div>
-        ) : clients.length === 0 ? (
+        ) : clients.length === 0 && !isLoading ? (
           <div className="py-16 text-center">
             <p className="text-sm text-muted-foreground">No clients yet.</p>
             <button
@@ -248,11 +263,37 @@ export default function ClientsPage() {
         )}
       </div>
 
+      {pagination && pagination.totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Showing {(page - 1) * pagination.limit + 1}–{Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 1}
+              className="rounded-md border border-border p-1.5 hover:bg-accent disabled:opacity-40"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="px-1">Page {page} of {pagination.totalPages}</span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page === pagination.totalPages}
+              className="rounded-md border border-border p-1.5 hover:bg-accent disabled:opacity-40"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Add / Edit dialog */}
       {dialogClient !== null && (
         <ClientDialog
           client={dialogClient === "new" ? undefined : dialogClient}
           onClose={() => setDialogClient(null)}
+          onSaved={() => setPage(1)}
         />
       )}
 

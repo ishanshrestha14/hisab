@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
-import { Plus } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 
@@ -13,6 +13,13 @@ interface Invoice {
   dueDate: string;
   client: { name: string };
   lineItems: { total: number }[];
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 type FilterTab = "ALL" | "DRAFT" | "SENT" | "PAID" | "OVERDUE";
@@ -35,11 +42,15 @@ const STATUS_STYLES: Record<string, string> = {
 export default function InvoicesPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
+  const [page, setPage] = useState(1);
 
-  const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
-    queryKey: ["invoices"],
-    queryFn: () => api.get("/api/invoices"),
+  const { data, isLoading } = useQuery<{ data: Invoice[]; pagination: Pagination }>({
+    queryKey: ["invoices", page],
+    queryFn: () => api.get(`/api/invoices?page=${page}&limit=20`),
   });
+
+  const invoices = data?.data ?? [];
+  const pagination = data?.pagination;
 
   const filtered =
     activeTab === "ALL" ? invoices : invoices.filter((inv) => inv.status === activeTab);
@@ -67,7 +78,7 @@ export default function InvoicesPage() {
         {TABS.map((tab) => {
           const count =
             tab.value === "ALL"
-              ? invoices.length
+              ? (pagination?.total ?? invoices.length)
               : invoices.filter((inv) => inv.status === tab.value).length;
 
           return (
@@ -166,6 +177,31 @@ export default function InvoicesPage() {
           </table>
         )}
       </div>
+
+      {pagination && pagination.totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Showing {(page - 1) * pagination.limit + 1}–{Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 1}
+              className="rounded-md border border-border p-1.5 hover:bg-accent disabled:opacity-40"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="px-1">Page {page} of {pagination.totalPages}</span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page === pagination.totalPages}
+              className="rounded-md border border-border p-1.5 hover:bg-accent disabled:opacity-40"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
