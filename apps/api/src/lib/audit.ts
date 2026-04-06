@@ -1,4 +1,5 @@
 import { prisma } from "@hisab/db";
+import { logger } from "./logger";
 
 export type AuditAction =
   | "invoice.created"
@@ -27,5 +28,5 @@ export function audit(params: {
         after: params.after ?? undefined,
       },
     })
-    .catch((err) => console.error("[audit] Failed to write audit log:", err));
+    .catch((err) => logger.error({ err }, "Failed to write audit log"));
 }

@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { prisma } from "@hisab/db";
 import { sendOverdueReminderEmail } from "./email";
+import { logger } from "./logger";
 
 // Runs every day at 08:00 UTC
 // Finds SENT invoices past their due date, marks them OVERDUE, emails the freelancer
@@ -28,7 +29,7 @@ export function startCronJobs() {
         data: { status: "OVERDUE" },
       });
 
-      console.log(`[cron:overdue] Marked ${overdue.length} invoice(s) as OVERDUE`);
+      logger.info({ count: overdue.length }, "Marked invoices as OVERDUE");
 
       for (const invoice of overdue) {
         const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
@@ -44,11 +45,11 @@ export function startCronJobs() {
           dueDate: invoice.dueDate,
           portalUrl,
         }).catch((err) =>
-          console.error(`[cron:overdue] Failed to email for ${invoice.number}:`, err)
+          logger.error({ invoiceNumber: invoice.number, err }, "Failed to send overdue email")
         );
       }
     } catch (err) {
-      console.error("[cron:overdue] Job failed:", err);
+      logger.error({ err }, "Overdue cron job failed");
     }
   });
 }

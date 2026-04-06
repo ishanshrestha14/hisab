@@ -1,5 +1,6 @@
 // Typed in-process event bus. Listeners are fire-and-forget — errors are caught
 // and logged but never propagate to the emitting route handler.
+import { logger } from "./logger";
 
 export type EventMap = {
   "invoice.sent": {
@@ -36,7 +37,7 @@ class EventBus {
     const handlers = this.listeners.get(event) ?? [];
     for (const handler of handlers) {
       Promise.resolve(handler(payload)).catch((err) =>
-        console.error(`[events] Handler error for "${event}":`, err)
+        logger.error({ event, err }, "Event handler error")
       );
     }
   }

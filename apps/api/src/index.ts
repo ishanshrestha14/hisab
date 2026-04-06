@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { logger as honoLogger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { rateLimiter } from "hono-rate-limiter";
 import { env } from "./lib/env";
 import { prisma } from "@hisab/db";
+import { logger } from "./lib/logger";
 import { auth } from "./lib/auth";
 import { startCronJobs } from "./lib/cron";
 import { registerListeners } from "./lib/listeners";
@@ -20,7 +21,7 @@ const app = new Hono();
 
 // ─── Global middleware ────────────────────────────────────────────────────────
 
-app.use(logger());
+app.use(honoLogger());
 app.use(secureHeaders());
 
 app.use(
@@ -93,10 +94,10 @@ const server = serve({ fetch: app.fetch, port: PORT }, () => {
 // then disconnect Prisma. Prevents data loss during Docker/Railway restarts.
 
 async function shutdown(signal: string) {
-  console.log(`[shutdown] Received ${signal}, shutting down…`);
+  logger.info({ signal }, "Shutting down…");
   server.close(async () => {
     await prisma.$disconnect();
-    console.log("[shutdown] Clean exit.");
+    logger.info("Clean exit.");
     process.exit(0);
   });
 }
