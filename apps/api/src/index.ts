@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { rateLimiter } from "hono-rate-limiter";
 import { env } from "./lib/env";
 import { prisma } from "@hisab/db";
 import { auth } from "./lib/auth";
@@ -31,6 +32,18 @@ app.use(
 
 // ─── Better Auth — handles all /api/auth/* routes ────────────────────────────
 // Better Auth generates: /sign-in, /sign-up, /sign-out, /session, /callback, etc.
+
+// Rate-limit sign-in to prevent brute-force — 10 attempts per 15 min per IP
+app.use(
+  "/api/auth/sign-in/*",
+  rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-6",
+    keyGenerator: (c) =>
+      (c.req.header("x-forwarded-for") ?? "unknown").split(",")[0].trim(),
+  })
+);
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => {
   return auth.handler(c.req.raw);
