@@ -14,3 +14,6 @@ packages/db/prisma/migrations/*.lock
 .claude/
 .mcp.json
 CLAUDE.md
+
+# Content planning (private)
+docs/content/
