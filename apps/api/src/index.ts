@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { rateLimiter } from "hono-rate-limiter";
 import { env } from "./lib/env";
 import { prisma } from "@hisab/db";
@@ -20,6 +21,7 @@ const app = new Hono();
 // ─── Global middleware ────────────────────────────────────────────────────────
 
 app.use(logger());
+app.use(secureHeaders());
 
 app.use(
   cors({
@@ -81,7 +83,23 @@ app.get("/health", async (c) => {
 
 const PORT = env.PORT;
 
-serve({ fetch: app.fetch, port: PORT }, () => {
+const server = serve({ fetch: app.fetch, port: PORT }, () => {
   registerListeners();
   startCronJobs();
 });
+
+// ─── Graceful shutdown ────────────────────────────────────────────────────────
+// On SIGTERM/SIGINT: stop accepting connections, let in-flight requests finish,
+// then disconnect Prisma. Prevents data loss during Docker/Railway restarts.
+
+async function shutdown(signal: string) {
+  console.log(`[shutdown] Received ${signal}, shutting down…`);
+  server.close(async () => {
+    await prisma.$disconnect();
+    console.log("[shutdown] Clean exit.");
+    process.exit(0);
+  });
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
