@@ -39,6 +39,7 @@ model User {
 
   clients       Client[]
   invoices      Invoice[]
+  auditLogs     AuditLog[]
 
   // Exchange rate cache per user is global — stored separately
   exchangeRates ExchangeRate[]
@@ -147,6 +148,25 @@ model LineItem {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+}
+
+// ─── Audit log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  entityType String   // e.g. "invoice"
+  entityId   String
+  action     String   // e.g. "invoice.created"
+  before     Json?    // state snapshot before the change
+  after      Json?    // state snapshot after the change
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, entityType])
+  @@index([entityId])
+  @@index([createdAt])
 }
 
 // ─── Exchange rate cache ───────────────────────────────────────────────────────

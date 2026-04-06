@@ -9,6 +9,7 @@ import {
 import { getNPRRate } from "../lib/exchange-rate";
 import { sendInvoiceEmail } from "../lib/email";
 import { apiError } from "../lib/errors";
+import { audit } from "../lib/audit";
 
 const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
@@ -102,6 +103,14 @@ invoices.post("/", zValidator("json", createInvoiceSchema), async (c) => {
     });
   });
 
+  audit({
+    userId: user.id,
+    entityType: "invoice",
+    entityId: invoice.id,
+    action: "invoice.created",
+    after: { id: invoice.id, number: invoice.number, status: invoice.status, currency: invoice.currency, clientId: invoice.clientId },
+  });
+
   return c.json(invoice, 201);
 });
 
@@ -133,6 +142,15 @@ invoices.put("/:id", zValidator("json", updateInvoiceSchema), async (c) => {
     include: { client: true, lineItems: true },
   });
 
+  audit({
+    userId: user.id,
+    entityType: "invoice",
+    entityId: id,
+    action: "invoice.updated",
+    before: { status: existing.status, currency: existing.currency, dueDate: existing.dueDate, notes: existing.notes },
+    after: { status: invoice.status, currency: invoice.currency, dueDate: invoice.dueDate, notes: invoice.notes },
+  });
+
   return c.json(invoice);
 });
 
@@ -154,6 +172,15 @@ invoices.patch(
       where: { id },
       data: { status },
     });
+    audit({
+      userId: user.id,
+      entityType: "invoice",
+      entityId: id,
+      action: "invoice.status_changed",
+      before: { status: existing.status },
+      after: { status: invoice.status },
+    });
+
     return c.json(invoice);
   }
 );
@@ -184,6 +211,15 @@ invoices.post("/:id/send", async (c) => {
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
   const portalUrl = `${process.env.WEB_URL}/portal/${invoice.token}`;
 
+  audit({
+    userId: user.id,
+    entityType: "invoice",
+    entityId: id,
+    action: "invoice.sent",
+    before: { status: invoice.status },
+    after: { status: "SENT" },
+  });
+
   sendInvoiceEmail({
     to: invoice.client.email,
     clientName: invoice.client.name,
@@ -209,6 +245,15 @@ invoices.delete("/:id", async (c) => {
   if (!existing) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   await prisma.invoice.delete({ where: { id } });
+
+  audit({
+    userId: user.id,
+    entityType: "invoice",
+    entityId: id,
+    action: "invoice.deleted",
+    before: { id: existing.id, number: existing.number, status: existing.status, currency: existing.currency },
+  });
+
   return c.json({ success: true });
 });
 
