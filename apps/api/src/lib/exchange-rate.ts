@@ -18,10 +18,7 @@ async function fetchRateFromApi(base: ForeignCurrency): Promise<number> {
 }
 
 // Get NPR rate for a base currency — returns cached value if already fetched today
-export async function getNPRRate(
-  base: ForeignCurrency,
-  userId: string
-): Promise<number> {
+export async function getNPRRate(base: ForeignCurrency): Promise<number> {
   const date = today();
 
   const cached = await prisma.exchangeRate.findFirst({
@@ -31,18 +28,16 @@ export async function getNPRRate(
 
   const rateToNPR = await fetchRateFromApi(base);
 
-  // Upsert — another user may have cached it between our read and write
+  // Upsert — concurrent requests may race; ignore unique constraint violation
   await prisma.exchangeRate
-    .create({ data: { base, date, rateToNPR, userId } })
-    .catch(() => {}); // ignore unique constraint violation
+    .create({ data: { base, date, rateToNPR } })
+    .catch(() => {});
 
   return rateToNPR;
 }
 
 // Get NPR rates for all foreign currencies — used by dashboard and exchange-rates endpoint
-export async function getAllNPRRates(
-  userId: string
-): Promise<Record<ForeignCurrency, number>> {
+export async function getAllNPRRates(): Promise<Record<ForeignCurrency, number>> {
   const date = today();
 
   const cached = await prisma.exchangeRate.findMany({
@@ -57,7 +52,7 @@ export async function getAllNPRRates(
   // Fetch any missing currencies
   await Promise.all(
     CURRENCIES.filter((c) => !rates[c]).map(async (c) => {
-      rates[c] = await getNPRRate(c, userId);
+      rates[c] = await getNPRRate(c);
     })
   );
 

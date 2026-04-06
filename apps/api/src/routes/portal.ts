@@ -49,8 +49,7 @@ portal.get("/:token", viewLimiter, async (c) => {
   let nprRate: number | null = null;
   if (invoice.currency !== "NPR") {
     nprRate = await getNPRRate(
-      invoice.currency as "USD" | "GBP" | "EUR",
-      invoice.userId
+      invoice.currency as "USD" | "GBP" | "EUR"
     ).catch(() => null);
   }
 

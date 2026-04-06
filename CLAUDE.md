@@ -84,11 +84,11 @@ Optional for Week 1: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 | Week | Focus |
 |------|-------|
 | 1 ✅ | Monorepo init, Prisma schema + migrations, Better Auth (email + Google), login/signup UI |
-| 2    | Client CRUD (API + UI), Invoice creation form with live totals, auto invoice numbering |
-| 3    | Invoice list + status tabs, NPR conversion (exchangerate.host + DB cache), dashboard stats |
-| 4    | Client portal (public `/portal/:token`), PDF export, "Mark as Paid" flow |
-| 5    | Resend email (send invoice, reminder, paid notification), overdue cron job, polish |
-| 6    | Docker + docker-compose, README, `.env.example`, Vercel + Railway deploy, GitHub launch |
+| 2 ✅ | Client CRUD (API + UI), Invoice creation form with live totals, auto invoice numbering |
+| 3 ✅ | Invoice list + status tabs, NPR conversion (exchangerate.host + DB cache), dashboard stats |
+| 4 ✅ | Client portal (public `/portal/:token`), PDF export, "Mark as Paid" flow |
+| 5 ✅ | Resend email (send invoice, reminder, paid notification), overdue cron job, polish |
+| 6 ✅ | Docker + docker-compose, README, `.env.example`, Vercel + Railway deploy, GitHub launch |
 
 ### Key decisions
 - `packages/ui` — shadcn components installed once, shared across apps (future-proofing)
@@ -96,6 +96,42 @@ Optional for Week 1: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `tsx` for running TypeScript in the API during dev
 - `date-fns` for date math (due dates, overdue detection)
 - Email (Resend) ships in Week 5 so Week 6 is purely infra + launch prep
+
+---
+
+## Portfolio Upgrade Plan
+
+Full codebase review done 2026-04-05. README rewritten, CONTRIBUTING.md created, GitHub issue/PR templates added, LICENSE file added. Below are the remaining code improvements, ordered by priority.
+
+### P1 — Quick Wins ✅
+
+- [x] **Add database indexes** — Added `@@index` to Invoice, Client, LineItem in `schema.prisma`. Run `pnpm --filter @hisab/db db:migrate` to apply
+- [x] **Fix send-invoice operation order** — Status updates before email now. Email is fire-and-forget
+- [x] **Add environment validation** — `apps/api/src/lib/env.ts` validates all env vars at startup via Zod
+- [x] **Add error boundary to cron job** — Wrapped in try/catch with structured logging
+
+### P2 — Structural Improvements ✅
+
+- [x] **Standardize error responses** — `apps/api/src/lib/errors.ts` with `apiError(c, code, message)` returning `{ error: { code, message } }`. Used across all routes and auth middleware
+- [x] **Rate limiting on public portal** — `hono-rate-limiter` installed. 30 req/15min GET, 5 req/hr mark-paid per IP via `x-forwarded-for`
+- [x] **Fix invoice number race condition** — `MAX(CAST(SUBSTRING(number FROM 5) AS INTEGER))` raw query inside `$transaction`. `@@unique([userId, number])` constraint added to schema
+- [x] **Dashboard SQL aggregation** — Two `$queryRaw` queries (totals + paid-by-currency) replace the full `findMany`. `findMany` kept only for 5 recent invoices
+
+### P3 — Senior-Level Features ✅
+
+- [x] **Audit logging** — `AuditLog` model added to schema. `apps/api/src/lib/audit.ts` with fire-and-forget `audit()`. Instrumented all 5 invoice mutation routes
+- [x] **Idempotent invoice creation** — Add `IdempotencyKey` model. Create middleware that caches responses by `Idempotency-Key` header with 24h TTL
+- [x] **Event bus** — `apps/api/src/lib/events.ts` with typed `EventBus`. `invoice.sent` + `invoice.paid` emitted from routes. Email listeners registered via `apps/api/src/lib/listeners.ts` at startup
+
+### P4 — Polish
+
+- [x] **Pagination** — Add `page`/`limit` query params to GET /api/invoices and GET /api/clients. Return `{ data, pagination }`
+- [x] **Health check improvement** — Make `/health` verify DB connectivity with a simple Prisma query
+- [x] **Clean up ExchangeRate userId** — Remove userId from ExchangeRate (cache is global) or make lookups consistent
+
+### Architecture Note
+
+Extract business logic from route handlers into `apps/api/src/services/` as you touch routes for the fixes above. Don't do it as a standalone refactor — do it incrementally. Even 2-3 services (InvoiceService, AuditService) are enough to demonstrate the pattern.
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph

@@ -41,9 +41,6 @@ model User {
   invoices         Invoice[]
   auditLogs        AuditLog[]
   idempotencyKeys  IdempotencyKey[]
-
-  // Exchange rate cache per user is global — stored separately
-  exchangeRates ExchangeRate[]
 }
 
 model Session {
@@ -192,13 +189,10 @@ model IdempotencyKey {
 
 model ExchangeRate {
   id        String   @id @default(cuid())
-  userId    String
   base      Currency
   rateToNPR Float    // 1 base = X NPR
   fetchedAt DateTime @default(now())
   date      String   // "YYYY-MM-DD" — used as cache key
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([base, date])
 }

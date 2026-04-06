@@ -31,15 +31,24 @@ async function nextInvoiceNumber(
   return `INV-${String(next).padStart(3, "0")}`;
 }
 
-// GET /api/invoices
+// GET /api/invoices?page=1&limit=20
 invoices.get("/", async (c) => {
   const user = c.get("user");
-  const data = await prisma.invoice.findMany({
-    where: { userId: user.id },
-    include: { client: { select: { name: true } }, lineItems: true },
-    orderBy: { createdAt: "desc" },
-  });
-  return c.json(data);
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
+  const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
+
+  const [data, total] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { userId: user.id },
+      include: { client: { select: { name: true } }, lineItems: true },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.invoice.count({ where: { userId: user.id } }),
+  ]);
+
+  return c.json({ data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 // GET /api/invoices/:id
@@ -59,8 +68,7 @@ invoices.get("/:id", async (c) => {
   let nprRate: number | null = null;
   if (invoice.currency !== "NPR") {
     nprRate = await getNPRRate(
-      invoice.currency as "USD" | "GBP" | "EUR",
-      user.id
+      invoice.currency as "USD" | "GBP" | "EUR"
     ).catch(() => null);
   }
 

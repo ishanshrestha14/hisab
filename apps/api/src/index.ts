@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { env } from "./lib/env";
+import { prisma } from "@hisab/db";
 import { auth } from "./lib/auth";
 import { startCronJobs } from "./lib/cron";
 import { registerListeners } from "./lib/listeners";
@@ -54,7 +55,14 @@ app.route("/api/portal", portal);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
-app.get("/health", (c) => c.json({ status: "ok" }));
+app.get("/health", async (c) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return c.json({ status: "ok", db: "ok" });
+  } catch {
+    return c.json({ status: "degraded", db: "unreachable" }, 503);
+  }
+});
 
 // ─── Start server ─────────────────────────────────────────────────────────────
 

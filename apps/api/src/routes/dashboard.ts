@@ -47,7 +47,7 @@ dashboard.get("/stats", async (c) => {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
-    getAllNPRRates(user.id).catch(() => ({ USD: 0, GBP: 0, EUR: 0 })),
+    getAllNPRRates().catch(() => ({ USD: 0, GBP: 0, EUR: 0 })),
   ]);
 
   const agg = aggRows[0];

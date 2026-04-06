@@ -9,14 +9,23 @@ const clients = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
 
-// GET /api/clients
+// GET /api/clients?page=1&limit=20
 clients.get("/", async (c) => {
   const user = c.get("user");
-  const data = await prisma.client.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-  });
-  return c.json(data);
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
+  const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
+
+  const [data, total] = await Promise.all([
+    prisma.client.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.client.count({ where: { userId: user.id } }),
+  ]);
+
+  return c.json({ data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 // POST /api/clients

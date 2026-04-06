@@ -8,8 +8,7 @@ const exchangeRates = new Hono<{
 // GET /api/exchange-rates/latest
 // Returns today's NPR rates for USD, GBP, EUR (cached in DB)
 exchangeRates.get("/latest", async (c) => {
-  const user = c.get("user");
-  const rates = await getAllNPRRates(user.id);
+  const rates = await getAllNPRRates();
   return c.json(rates);
 });
 
