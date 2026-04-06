@@ -1,57 +1,65 @@
 # Hisab — Roadmap
 
-## Milestones
+## Build history
 
-| Week | Status | Focus |
-|------|--------|-------|
-| 1 | ✅ Done | Monorepo init, Prisma schema + migrations, Better Auth (email + Google), login/signup UI |
-| 2 | ✅ Done | Client CRUD (API + UI), Invoice creation form with live totals, auto invoice numbering |
-| 3 | 🔜 Next | Invoice list + status tabs, NPR conversion (exchangerate.host + DB cache), dashboard stats |
-| 4 | — | Client portal (public `/portal/:token`), PDF export, "Mark as Paid" flow |
-| 5 | — | Resend email (send invoice, reminder, paid notification), overdue cron job, polish |
-| 6 | — | Docker + docker-compose, README, `.env.example`, Vercel + Railway deploy, GitHub launch |
+| Phase | Status | Focus |
+|-------|--------|-------|
+| Week 1 | ✅ | Monorepo, Prisma schema, Better Auth (email + Google), login/signup UI |
+| Week 2 | ✅ | Client CRUD, invoice creation form, auto invoice numbering |
+| Week 3 | ✅ | Invoice list + status tabs, NPR conversion, dashboard stats |
+| Week 4 | ✅ | Client portal (`/portal/:token`), PDF export, Mark as Paid flow |
+| Week 5 | ✅ | Resend email, overdue cron job, UI polish |
+| Week 6 | ✅ | Docker + docker-compose, README, `.env.example`, Railway + Vercel deploy |
+| Portfolio upgrade | ✅ | P1–P4 improvements — see below |
+| Production hardening | ✅ | Security, reliability, observability — see below |
 
 ---
 
-## Week 1 — Foundation
-- Turborepo + pnpm workspaces monorepo
-- Prisma schema: `User`, `Client`, `Invoice`, `LineItem`, `ExchangeRate`
-- Better Auth wired (email/password + Google OAuth, HTTP-only cookies)
-- Login and signup pages
-- Protected route shell with AppLayout sidebar
+## Portfolio upgrade (P1–P4)
 
-## Week 2 — Core CRUD
-- Client CRUD: list, add, edit, delete (with ownership checks)
-- Invoice creation form with dynamic line items and live total
-- Auto invoice numbering: `INV-001`, `INV-002`…
-- Invoice list page with status badges
-- Routes: `/clients`, `/invoices`, `/invoices/new`
+### P1 — Quick wins ✅
+- Database indexes on `Invoice`, `Client`, `LineItem` for common query patterns
+- Fixed send-invoice operation order — status updates before email (email is best-effort)
+- Environment validation at startup via Zod (`lib/env.ts`)
+- Error boundary on cron job with structured logging
 
-## Week 3 — Data & Conversions
-- Invoice status filter tabs (All / Draft / Sent / Paid / Overdue)
-- NPR conversion: fetch from exchangerate.host, cache in `ExchangeRate` table (1 per day per currency)
-- Dashboard stats with real data: total invoiced, paid, outstanding, overdue count
-- NPR equivalent shown on invoice and dashboard
+### P2 — Structural improvements ✅
+- Standardized error responses — `{ error: { code, message } }` everywhere via `lib/errors.ts`
+- Rate limiting on public portal — `hono-rate-limiter` (30 req/15min GET, 5 req/hr mark-paid)
+- Fixed invoice number race condition — `MAX()` raw query inside `$transaction` + `@@unique([userId, number])`
+- Dashboard SQL aggregation — `$queryRaw` replaces in-memory `findMany` + reduce
 
-## Week 4 — Client Portal & PDF
-- Public portal page at `/portal/:token` — no auth required
-- Client can view invoice details (line items, total, due date)
-- "Mark as Paid" button on portal → PATCH invoice status to PAID
-- PDF export via `@react-pdf/renderer` (download from invoice detail page)
-- Invoice detail page at `/invoices/:id`
+### P3 — Senior-level features ✅
+- Audit logging — `AuditLog` model, `lib/audit.ts`, instrumented on all 5 invoice mutation routes
+- Idempotent invoice creation — `IdempotencyKey` model + middleware, 24h TTL, `Idempotency-Key` header
+- Event bus — typed `EventBus` in `lib/events.ts`; email decoupled from route handlers via listeners
 
-## Week 5 — Email & Automation
-- Resend integration for transactional email
-- Send invoice email to client (includes portal link)
-- Payment reminder email (manual trigger)
-- "Invoice paid" notification email to freelancer
-- Overdue cron job: daily check, flip SENT → OVERDUE past due date
-- UI polish: empty states, loading skeletons, mobile layout review
+### P4 — Polish ✅
+- Pagination — `GET /api/invoices` and `GET /api/clients` return `{ data, pagination }`
+- Health check — `/health` verifies DB connectivity with `SELECT 1`
+- ExchangeRate userId cleanup — cache is global; removed `userId` column and relation
 
-## Week 6 — Launch
-- `Dockerfile` + `docker-compose.yml` (app + postgres)
-- `README.md` with setup instructions, screenshots
-- `.env.example` with all required variables documented
-- Vercel deployment for frontend
-- Railway deployment for API + database
-- GitHub repo cleanup and public launch
+---
+
+## Production hardening ✅
+
+Done after P4:
+
+- Frontend pagination — `InvoicesPage`, `ClientsPage`, `InvoiceNewPage` updated to consume `{ data, pagination }`
+- Auth rate limiting — 10 req/15min per IP on `/api/auth/sign-in/*`
+- Security headers — `hono/secure-headers` globally (`X-Frame-Options`, CSP, etc.)
+- Graceful shutdown — `SIGTERM`/`SIGINT` drain in-flight requests, disconnect Prisma, exit cleanly
+- Structured logging — `pino` (`lib/logger.ts`); JSON in production, pretty-print in dev
+- CI/CD — `.github/workflows/ci.yml` typechecks and lints on every PR and push to main
+
+---
+
+## Planned
+
+- [ ] Recurring invoices with configurable frequency
+- [ ] Webhook notifications for invoice events (`invoice.created`, `invoice.paid`)
+- [ ] Multi-language support (Nepali / English)
+- [ ] CSV/Excel data export
+- [ ] Background job queue (BullMQ + Redis) for email and cron at scale
+- [ ] Services layer — extract business logic from route handlers into `src/services/`
+- [ ] Test suite — integration tests against a real DB (no mocks)

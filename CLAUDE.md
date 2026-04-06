@@ -47,6 +47,10 @@ pnpm dev                              # starts all apps via turbo
 - Auth guard: `app.use("/api/clients/*", requireAuth)` before mounting
 - Zod validation: `zValidator("json", schema)` as route middleware
 - Always check resource ownership before update/delete: `findFirst({ where: { id, userId } })`
+- Error responses: always use `apiError(c, "NOT_FOUND", "message")` from `lib/errors.ts` — never `c.json({ error: "..." })`
+- Logging: use `logger` from `lib/logger.ts` — never `console.log/error`
+- Side-effects (email): emit via `eventBus` from `lib/events.ts` — never import email functions directly in routes
+- Audit trail: call `audit(...)` from `lib/audit.ts` after any invoice mutation
 
 ### Frontend patterns
 - Data fetching via TanStack Query (`useQuery` / `useMutation`)
@@ -60,10 +64,14 @@ pnpm dev                              # starts all apps via turbo
 - `@hisab/shared` — import Zod schemas and inferred TypeScript types
 
 ## Database schema summary
-Models: `User`, `Session`, `Account`, `Verification`, `Client`, `Invoice`, `LineItem`, `ExchangeRate`
+Models: `User`, `Session`, `Account`, `Verification`, `Client`, `Invoice`, `LineItem`, `ExchangeRate`, `AuditLog`, `IdempotencyKey`
 Enums: `Currency` (USD, GBP, EUR, NPR), `InvoiceStatus` (DRAFT, SENT, PAID, OVERDUE)
 
 Key: `Invoice.token` is the public cuid used for `/portal/:token` — never expose `Invoice.id` publicly.
+
+- `AuditLog` — tracks every invoice mutation (create/update/delete/status-change/send) with `before`/`after` JSON snapshots
+- `IdempotencyKey` — caches `POST /api/invoices` responses by `(key, userId)` for 24h; prevents duplicate invoices on retry
+- `ExchangeRate` — global daily cache (no userId); `@@unique([base, date])`
 
 ## Public portal
 `GET /api/portal/:token` and `POST /api/portal/:token/mark-paid` are unauthenticated — no `requireAuth` middleware. The client portal page (`/portal/:token` in the web app) must work with zero cookies.
@@ -123,15 +131,26 @@ Full codebase review done 2026-04-05. README rewritten, CONTRIBUTING.md created,
 - [x] **Idempotent invoice creation** — Add `IdempotencyKey` model. Create middleware that caches responses by `Idempotency-Key` header with 24h TTL
 - [x] **Event bus** — `apps/api/src/lib/events.ts` with typed `EventBus`. `invoice.sent` + `invoice.paid` emitted from routes. Email listeners registered via `apps/api/src/lib/listeners.ts` at startup
 
-### P4 — Polish
+### P4 — Polish ✅
 
 - [x] **Pagination** — Add `page`/`limit` query params to GET /api/invoices and GET /api/clients. Return `{ data, pagination }`
 - [x] **Health check improvement** — Make `/health` verify DB connectivity with a simple Prisma query
 - [x] **Clean up ExchangeRate userId** — Remove userId from ExchangeRate (cache is global) or make lookups consistent
 
+### Production Readiness ✅
+
+Done after P4 — these weren't in the original plan but were needed before real deployment.
+
+- [x] **Frontend pagination** — `InvoicesPage`, `ClientsPage`, `InvoiceNewPage` updated to unwrap `{ data, pagination }`. Prev/next controls added
+- [x] **Auth rate limiting** — 10 req/15min per IP on `/api/auth/sign-in/*`
+- [x] **Security headers** — `hono/secure-headers` applied globally (`X-Frame-Options`, CSP, etc.)
+- [x] **Graceful shutdown** — `SIGTERM`/`SIGINT` stop the server, disconnect Prisma, exit cleanly
+- [x] **Structured logging** — `pino` in `apps/api/src/lib/logger.ts`; JSON in prod, pretty in dev; all `console.error` calls replaced
+- [x] **CI/CD** — `.github/workflows/ci.yml` typechecks API + web and runs lint on every PR/push to main
+
 ### Architecture Note
 
-Extract business logic from route handlers into `apps/api/src/services/` as you touch routes for the fixes above. Don't do it as a standalone refactor — do it incrementally. Even 2-3 services (InvoiceService, AuditService) are enough to demonstrate the pattern.
+Extract business logic from route handlers into `apps/api/src/services/` as you touch routes. Don't do it as a standalone refactor — do it incrementally. Even 2-3 services (InvoiceService, AuditService) are enough to demonstrate the pattern.
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph

@@ -53,8 +53,8 @@ hisab/
 │   ├── api/                  # Hono backend (TypeScript)
 │   │   ├── src/
 │   │   │   ├── routes/           # clients, invoices, portal, dashboard, exchange-rates
-│   │   │   ├── middleware/       # Auth guard (Better Auth session validation)
-│   │   │   └── lib/              # Auth config, email templates, exchange rate cache, cron
+│   │   │   ├── middleware/       # requireAuth, idempotency
+│   │   │   └── lib/              # auth, email, exchange-rate, cron, audit, events, listeners, logger, errors, env
 │   │   └── Dockerfile
 │   └── web/                  # React + Vite frontend
 │       ├── src/
@@ -92,7 +92,10 @@ User ──┬── Client ──── Invoice ──── LineItem
        ├── Session        ├── token (opaque cuid for public portal URL)
        ├── Account        └── nprRate (cached at send time for PDF consistency)
        ├── Verification
-       └── ExchangeRate (daily cache: 1 row per currency per day)
+       ├── AuditLog (entityType, entityId, action, before/after JSON)
+       └── IdempotencyKey (key, statusCode, response — 24h TTL)
+
+ExchangeRate (global daily cache: 1 row per currency per day)
 ```
 
 **Enums:** `Currency` (USD, GBP, EUR, NPR) · `InvoiceStatus` (DRAFT, SENT, PAID, OVERDUE)
@@ -132,9 +135,9 @@ For a single-developer project, a well-structured monolith with clean module bou
 Single Node.js process + single PostgreSQL instance. Comfortable for hundreds of active users.
 
 ### Read Optimization (1K–10K users)
-- **Database indexes** — Add composite indexes on `(userId, status)`, `(userId, createdAt)`, `(dueDate, status)` for common query patterns
-- **SQL aggregation** — Move dashboard stats from in-memory computation to database-level `SUM`/`COUNT` queries
-- **Response caching** — Cache dashboard stats and exchange rates in memory with short TTLs
+- **Database indexes** ✅ — Composite indexes on `(userId, status)`, `(userId, createdAt)`, `(dueDate, status)` already in place
+- **SQL aggregation** ✅ — Dashboard stats computed with `$queryRaw` `SUM`/`COUNT` — no in-memory reduce
+- **Response caching** — Cache dashboard stats in memory with short TTLs
 - **Connection pooling** — PgBouncer in front of PostgreSQL for connection management
 
 ### Horizontal Scaling (10K+ users)
@@ -232,11 +235,19 @@ The app is available at `http://localhost` (port 80). PostgreSQL, API, and front
 
 ## Roadmap
 
-- [ ] Audit logging for invoice state changes
-- [ ] Idempotent invoice creation (Stripe-style idempotency keys)
-- [ ] Rate limiting on public portal endpoints
-- [ ] Database-level aggregation for dashboard queries
-- [ ] Database indexes for common query patterns
+### Done
+- [x] Audit logging — every invoice mutation recorded with before/after snapshots
+- [x] Idempotent invoice creation — Stripe-style `Idempotency-Key` header with 24h TTL
+- [x] Rate limiting — public portal (30 req/15min GET, 5 req/hr mark-paid) and sign-in (10 req/15min) per IP
+- [x] Database-level aggregation — dashboard stats computed with SQL `SUM`/`COUNT`, not in-memory
+- [x] Database indexes — composite indexes on `Invoice`, `Client`, `LineItem` for common query patterns
+- [x] Pagination — `GET /api/invoices` and `GET /api/clients` return `{ data, pagination }`
+- [x] Structured logging — pino with JSON output in production, pretty-print in dev
+- [x] Graceful shutdown — `SIGTERM`/`SIGINT` handlers drain in-flight requests before exit
+- [x] Security headers — `hono/secure-headers` sets `X-Frame-Options`, CSP, etc.
+- [x] Event bus — typed in-process `EventBus`; email sending decoupled from route handlers
+
+### Planned
 - [ ] Recurring invoices with configurable frequency
 - [ ] Webhook notifications for invoice events
 - [ ] Multi-language support (Nepali / English)
