@@ -14,10 +14,19 @@ const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
 
-// Auto-generate invoice number: INV-001, INV-002, ...
-async function generateInvoiceNumber(userId: string): Promise<string> {
-  const count = await prisma.invoice.count({ where: { userId } });
-  return `INV-${String(count + 1).padStart(3, "0")}`;
+// Generate the next invoice number inside a transaction using MAX to avoid race conditions.
+// count() + 1 would duplicate numbers under concurrent requests; MAX is safe.
+async function nextInvoiceNumber(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  userId: string
+): Promise<string> {
+  const rows = await tx.$queryRaw<[{ max: number | null }]>`
+    SELECT MAX(CAST(SUBSTRING(number FROM 5) AS INTEGER)) AS max
+    FROM "Invoice"
+    WHERE "userId" = ${userId}
+  `;
+  const next = (rows[0].max ?? 0) + 1;
+  return `INV-${String(next).padStart(3, "0")}`;
 }
 
 // GET /api/invoices
@@ -67,27 +76,30 @@ invoices.post("/", zValidator("json", createInvoiceSchema), async (c) => {
   const user = c.get("user");
   const { lineItems, ...body } = c.req.valid("json");
 
-  // Verify client belongs to user
+  // Verify client belongs to user (outside transaction — read-only, no contention)
   const client = await prisma.client.findFirst({
     where: { id: body.clientId, userId: user.id },
   });
   if (!client) return apiError(c, "NOT_FOUND", "Client not found");
 
-  const number = await generateInvoiceNumber(user.id);
-
-  const invoice = await prisma.invoice.create({
-    data: {
-      ...body,
-      userId: user.id,
-      number,
-      lineItems: {
-        create: lineItems.map((item) => ({
-          ...item,
-          total: item.quantity * item.unitPrice,
-        })),
+  // Wrap number generation + insert in a transaction so two concurrent requests
+  // can't read the same MAX and produce duplicate invoice numbers.
+  const invoice = await prisma.$transaction(async (tx) => {
+    const number = await nextInvoiceNumber(tx, user.id);
+    return tx.invoice.create({
+      data: {
+        ...body,
+        userId: user.id,
+        number,
+        lineItems: {
+          create: lineItems.map((item) => ({
+            ...item,
+            total: item.quantity * item.unitPrice,
+          })),
+        },
       },
-    },
-    include: { client: true, lineItems: true },
+      include: { client: true, lineItems: true },
+    });
   });
 
   return c.json(invoice, 201);
