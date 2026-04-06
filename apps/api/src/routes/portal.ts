@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@hisab/db";
 import { getNPRRate } from "../lib/exchange-rate";
 import { sendPaidNotificationEmail } from "../lib/email";
+import { apiError } from "../lib/errors";
 
 const portal = new Hono();
 
@@ -20,7 +21,7 @@ portal.get("/:token", async (c) => {
     },
   });
 
-  if (!invoice) return c.json({ error: "Invoice not found" }, 404);
+  if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
 
@@ -61,10 +62,10 @@ portal.post("/:token/mark-paid", async (c) => {
       lineItems: true,
     },
   });
-  if (!invoice) return c.json({ error: "Invoice not found" }, 404);
+  if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   if (invoice.status !== "SENT") {
-    return c.json({ error: "Only sent invoices can be marked as paid" }, 400);
+    return apiError(c, "BAD_REQUEST", "Only sent invoices can be marked as paid");
   }
 
   const updated = await prisma.invoice.update({

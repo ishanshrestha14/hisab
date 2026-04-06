@@ -8,6 +8,7 @@ import {
 } from "@hisab/shared";
 import { getNPRRate } from "../lib/exchange-rate";
 import { sendInvoiceEmail } from "../lib/email";
+import { apiError } from "../lib/errors";
 
 const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
@@ -41,7 +42,7 @@ invoices.get("/:id", async (c) => {
       lineItems: true,
     },
   });
-  if (!invoice) return c.json({ error: "Not found" }, 404);
+  if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
   let nprRate: number | null = null;
@@ -70,7 +71,7 @@ invoices.post("/", zValidator("json", createInvoiceSchema), async (c) => {
   const client = await prisma.client.findFirst({
     where: { id: body.clientId, userId: user.id },
   });
-  if (!client) return c.json({ error: "Client not found" }, 404);
+  if (!client) return apiError(c, "NOT_FOUND", "Client not found");
 
   const number = await generateInvoiceNumber(user.id);
 
@@ -101,7 +102,7 @@ invoices.put("/:id", zValidator("json", updateInvoiceSchema), async (c) => {
   const existing = await prisma.invoice.findFirst({
     where: { id, userId: user.id },
   });
-  if (!existing) return c.json({ error: "Not found" }, 404);
+  if (!existing) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   const invoice = await prisma.invoice.update({
     where: { id },
@@ -135,7 +136,7 @@ invoices.patch(
     const existing = await prisma.invoice.findFirst({
       where: { id, userId: user.id },
     });
-    if (!existing) return c.json({ error: "Not found" }, 404);
+    if (!existing) return apiError(c, "NOT_FOUND", "Invoice not found");
 
     const invoice = await prisma.invoice.update({
       where: { id },
@@ -157,9 +158,9 @@ invoices.post("/:id/send", async (c) => {
       lineItems: true,
     },
   });
-  if (!invoice) return c.json({ error: "Not found" }, 404);
+  if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
   if (invoice.status === "PAID") {
-    return c.json({ error: "Cannot send a paid invoice" }, 400);
+    return apiError(c, "BAD_REQUEST", "Cannot send a paid invoice");
   }
 
   // Update status FIRST — email is best-effort, don't let email failure block the status change
@@ -193,7 +194,7 @@ invoices.delete("/:id", async (c) => {
   const existing = await prisma.invoice.findFirst({
     where: { id, userId: user.id },
   });
-  if (!existing) return c.json({ error: "Not found" }, 404);
+  if (!existing) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   await prisma.invoice.delete({ where: { id } });
   return c.json({ success: true });

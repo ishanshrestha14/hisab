@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { prisma } from "@hisab/db";
 import { createClientSchema, updateClientSchema } from "@hisab/shared";
+import { apiError } from "../lib/errors";
 
 // Each route file gets its own Hono instance — mounted at /api/clients in index.ts
 const clients = new Hono<{
@@ -39,7 +40,7 @@ clients.put("/:id", zValidator("json", updateClientSchema), async (c) => {
   const existing = await prisma.client.findFirst({
     where: { id, userId: user.id },
   });
-  if (!existing) return c.json({ error: "Not found" }, 404);
+  if (!existing) return apiError(c, "NOT_FOUND", "Client not found");
 
   const updated = await prisma.client.update({
     where: { id },
@@ -56,7 +57,7 @@ clients.delete("/:id", async (c) => {
   const existing = await prisma.client.findFirst({
     where: { id, userId: user.id },
   });
-  if (!existing) return c.json({ error: "Not found" }, 404);
+  if (!existing) return apiError(c, "NOT_FOUND", "Client not found");
 
   await prisma.client.delete({ where: { id } });
   return c.json({ success: true });

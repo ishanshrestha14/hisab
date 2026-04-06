@@ -1,5 +1,6 @@
 import type { Context, Next } from "hono";
 import { auth } from "../lib/auth";
+import { apiError } from "../lib/errors";
 
 // Hono middleware — attaches the Better Auth session to context
 // Usage: app.use(requireAuth) on protected routes
@@ -9,7 +10,7 @@ export async function requireAuth(c: Context, next: Next) {
   });
 
   if (!session) {
-    return c.json({ error: "Unauthorized" }, 401);
+    return apiError(c, "UNAUTHORIZED", "Unauthorized");
   }
 
   // Attach to Hono context so route handlers can access it
