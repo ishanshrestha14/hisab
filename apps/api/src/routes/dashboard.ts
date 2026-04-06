@@ -6,51 +6,66 @@ const dashboard = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
 
+type AggRow = {
+  totalInvoiced: number | null;
+  totalPaid: number | null;
+  totalOutstanding: number | null;
+  overdueCount: bigint;
+};
+
+type PaidByCurrency = { currency: string; total: number };
+
 // GET /api/dashboard/stats
 dashboard.get("/stats", async (c) => {
   const user = c.get("user");
 
-  const [invoices, nprRates] = await Promise.all([
+  // Run all queries in parallel — SQL does the aggregation, not JS
+  const [aggRows, paidByCurrency, recentInvoices, nprRates] = await Promise.all([
+    // Single-pass aggregate: totals and overdue count
+    prisma.$queryRaw<AggRow[]>`
+      SELECT
+        SUM(li.total) FILTER (WHERE i.status IN ('DRAFT', 'SENT', 'PAID', 'OVERDUE')) AS "totalInvoiced",
+        SUM(li.total) FILTER (WHERE i.status = 'PAID')                                AS "totalPaid",
+        SUM(li.total) FILTER (WHERE i.status IN ('SENT', 'OVERDUE'))                  AS "totalOutstanding",
+        COUNT(*)      FILTER (WHERE i.status = 'OVERDUE')                             AS "overdueCount"
+      FROM "Invoice" i
+      JOIN "LineItem" li ON li."invoiceId" = i.id
+      WHERE i."userId" = ${user.id}
+    `,
+    // Paid totals grouped by currency — needed to convert each to NPR
+    prisma.$queryRaw<PaidByCurrency[]>`
+      SELECT i.currency, SUM(li.total) AS total
+      FROM "Invoice" i
+      JOIN "LineItem" li ON li."invoiceId" = i.id
+      WHERE i."userId" = ${user.id} AND i.status = 'PAID'
+      GROUP BY i.currency
+    `,
+    // Only the 5 most recent invoices for the activity list
     prisma.invoice.findMany({
       where: { userId: user.id },
       include: { lineItems: true, client: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
+      take: 5,
     }),
     getAllNPRRates(user.id).catch(() => ({ USD: 0, GBP: 0, EUR: 0 })),
   ]);
 
-  const sumLineItems = (statuses: string[]) =>
-    invoices
-      .filter((inv) => statuses.includes(inv.status))
-      .flatMap((inv) => inv.lineItems)
-      .reduce((sum, item) => sum + item.total, 0);
+  const agg = aggRows[0];
 
-  const toNPR = (currency: string, amount: number) => {
-    if (currency === "NPR") return amount;
-    const rate = nprRates[currency as keyof typeof nprRates] ?? 0;
-    return amount * rate;
-  };
-
-  const totalPaidNPR = invoices
-    .filter((inv) => inv.status === "PAID")
-    .reduce(
-      (sum, inv) =>
-        sum +
-        toNPR(
-          inv.currency,
-          inv.lineItems.reduce((s, i) => s + i.total, 0)
-        ),
-      0
-    );
+  const totalPaidNPR = paidByCurrency.reduce((sum, row) => {
+    const amount = Number(row.total);
+    if (row.currency === "NPR") return sum + amount;
+    return sum + amount * (nprRates[row.currency as keyof typeof nprRates] ?? 0);
+  }, 0);
 
   return c.json({
-    totalInvoiced: sumLineItems(["DRAFT", "SENT", "PAID", "OVERDUE"]),
-    totalPaid: sumLineItems(["PAID"]),
-    totalOutstanding: sumLineItems(["SENT", "OVERDUE"]),
-    overdueCount: invoices.filter((inv) => inv.status === "OVERDUE").length,
+    totalInvoiced: Number(agg?.totalInvoiced ?? 0),
+    totalPaid: Number(agg?.totalPaid ?? 0),
+    totalOutstanding: Number(agg?.totalOutstanding ?? 0),
+    overdueCount: Number(agg?.overdueCount ?? 0),
     totalPaidNPR,
     nprRates,
-    recentInvoices: invoices.slice(0, 5).map((inv) => ({
+    recentInvoices: recentInvoices.map((inv) => ({
       id: inv.id,
       number: inv.number,
       status: inv.status,
