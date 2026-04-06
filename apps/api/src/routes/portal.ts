@@ -1,13 +1,33 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { rateLimiter } from "hono-rate-limiter";
 import { prisma } from "@hisab/db";
 import { getNPRRate } from "../lib/exchange-rate";
 import { sendPaidNotificationEmail } from "../lib/email";
 import { apiError } from "../lib/errors";
 
+const keyFromIP = (c: Context) =>
+  (c.req.header("x-forwarded-for") ?? "unknown").split(",")[0].trim();
+
+// 30 requests per 15 minutes per IP — covers invoice view/PDF load
+const viewLimiter = rateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-6",
+  keyGenerator: keyFromIP,
+});
+
+// 5 requests per hour per IP — mark-paid is a write action, stricter limit
+const markPaidLimiter = rateLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-6",
+  keyGenerator: keyFromIP,
+});
+
 const portal = new Hono();
 
 // GET /api/portal/:token — public, no auth
-portal.get("/:token", async (c) => {
+portal.get("/:token", viewLimiter, async (c) => {
   const { token } = c.req.param();
 
   const invoice = await prisma.invoice.findUnique({
@@ -51,7 +71,7 @@ portal.get("/:token", async (c) => {
 });
 
 // POST /api/portal/:token/mark-paid — public, no auth
-portal.post("/:token/mark-paid", async (c) => {
+portal.post("/:token/mark-paid", markPaidLimiter, async (c) => {
   const { token } = c.req.param();
 
   const invoice = await prisma.invoice.findUnique({

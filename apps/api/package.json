@@ -16,6 +16,7 @@
     "better-auth": "^1.2.5",
     "date-fns": "^4.1.0",
     "hono": "^4.7.4",
+    "hono-rate-limiter": "^0.5.3",
     "node-cron": "^4.2.1",
     "resend": "^6.10.0",
     "zod": "^3.24.1"
