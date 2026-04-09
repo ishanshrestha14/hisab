@@ -8,6 +8,7 @@ import InvoicesPage from "./pages/InvoicesPage";
 import InvoiceNewPage from "./pages/InvoiceNewPage";
 import InvoiceDetailPage from "./pages/InvoiceDetailPage";
 import PortalPage from "./pages/PortalPage";
+import SettingsPage from "./pages/SettingsPage";
 import AppLayout from "./components/AppLayout";
 
 // Wraps any route that requires auth
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="invoices/new" element={<InvoiceNewPage />} />
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

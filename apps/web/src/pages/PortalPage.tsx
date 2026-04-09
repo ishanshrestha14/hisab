@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import { CheckCircle, Download } from "lucide-react";
+import { CheckCircle, Download, AlertTriangle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { InvoicePDF, type InvoicePDFProps } from "@/components/InvoicePDF";
 
@@ -19,12 +19,23 @@ const STATUS_STYLES: Record<string, string> = {
   OVERDUE: "bg-red-100 text-red-700",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draft",
+  SENT: "Sent",
+  PAID: "Paid",
+  OVERDUE: "Overdue",
+};
+
 export default function PortalPage() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   const [paid, setPaid] = useState(false);
 
-  const { data: invoice, isLoading, error } = useQuery<PortalInvoice>({
+  const {
+    data: invoice,
+    isLoading,
+    error,
+  } = useQuery<PortalInvoice>({
     queryKey: ["portal", token],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/portal/${token}`);
@@ -40,7 +51,9 @@ export default function PortalPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error ?? "Failed to mark as paid");
+        throw new Error(
+          (err as { error?: string }).error ?? "Failed to mark as paid"
+        );
       }
       return res.json();
     },
@@ -52,7 +65,7 @@ export default function PortalPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
       </div>
     );
@@ -60,10 +73,13 @@ export default function PortalPage() {
 
   if (error || !invoice) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-900">Invoice not found</p>
-          <p className="mt-1 text-sm text-gray-500">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+            <AlertTriangle size={24} className="text-red-600" />
+          </div>
+          <p className="text-lg font-semibold text-slate-900">Invoice not found</p>
+          <p className="mt-1 text-sm text-slate-500">
             This link may be invalid or expired.
           </p>
         </div>
@@ -74,65 +90,100 @@ export default function PortalPage() {
   const isPaid = paid || invoice.status === "PAID";
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-slate-50 px-4 py-12">
       <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500 text-white text-2xl font-bold">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500 text-white text-2xl font-bold shadow-sm select-none">
             ह
           </div>
-          <p className="text-sm text-gray-500">हिसाब Hisab — Invoice</p>
+          <p className="text-sm font-medium text-slate-400">
+            हिसाब Hisab — Invoice
+          </p>
         </div>
 
-        {/* Paid banner */}
+        {/* Paid success banner */}
         {isPaid && (
-          <div className="mb-6 flex items-center gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
-            <CheckCircle size={20} className="text-green-600 shrink-0" />
-            <p className="text-sm font-medium text-green-800">
-              This invoice has been marked as paid. Thank you!
+          <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-4 animate-in-up">
+            <CheckCircle size={20} className="shrink-0 text-green-600" />
+            <div>
+              <p className="text-sm font-semibold text-green-800">
+                Payment confirmed — thank you!
+              </p>
+              <p className="text-xs text-green-700">
+                The freelancer has been notified.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Overdue warning */}
+        {invoice.status === "OVERDUE" && !isPaid && (
+          <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+            <AlertTriangle size={18} className="shrink-0 text-red-600" />
+            <p className="text-sm font-medium text-red-800">
+              This invoice is overdue. Please arrange payment at your earliest convenience.
             </p>
           </div>
         )}
 
         {/* Invoice card */}
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           {/* Invoice header */}
-          <div className="flex items-start justify-between border-b border-gray-100 px-8 py-6">
+          <div className="flex items-start justify-between border-b border-slate-100 px-8 py-6">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Invoice</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{invoice.number}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Invoice
+              </p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">
+                {invoice.number}
+              </p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[invoice.status] ?? ""}`}>
-              {invoice.status}
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[invoice.status] ?? ""}`}
+            >
+              {STATUS_LABEL[invoice.status] ?? invoice.status}
             </span>
           </div>
 
           {/* From / To / Dates */}
-          <div className="grid grid-cols-3 gap-6 border-b border-gray-100 px-8 py-6">
+          <div className="grid grid-cols-3 gap-6 border-b border-slate-100 px-8 py-6">
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">From</p>
-              <p className="font-medium text-gray-900">{invoice.freelancer.name}</p>
-              <p className="text-sm text-gray-500">{invoice.freelancer.email}</p>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                From
+              </p>
+              <p className="font-medium text-slate-900">{invoice.freelancer.name}</p>
+              <p className="text-sm text-slate-500">{invoice.freelancer.email}</p>
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Bill To</p>
-              <p className="font-medium text-gray-900">{invoice.client.name}</p>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Bill To
+              </p>
+              <p className="font-medium text-slate-900">{invoice.client.name}</p>
               {invoice.client.company && (
-                <p className="text-sm text-gray-500">{invoice.client.company}</p>
+                <p className="text-sm text-slate-500">{invoice.client.company}</p>
               )}
-              <p className="text-sm text-gray-500">{invoice.client.email}</p>
+              <p className="text-sm text-slate-500">{invoice.client.email}</p>
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Issue Date</p>
-              <p className="text-sm text-gray-700">
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Issue Date
+              </p>
+              <p className="text-sm text-slate-700">
                 {new Date(invoice.issueDate).toLocaleDateString("en-US", {
-                  month: "long", day: "numeric", year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
                 })}
               </p>
-              <p className="mb-1 mt-3 text-xs font-medium uppercase tracking-wide text-gray-400">Due Date</p>
-              <p className="text-sm text-gray-700">
+              <p className="mb-1.5 mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Due Date
+              </p>
+              <p className="text-sm text-slate-700">
                 {new Date(invoice.dueDate).toLocaleDateString("en-US", {
-                  month: "long", day: "numeric", year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
                 })}
               </p>
             </div>
@@ -142,7 +193,7 @@ export default function PortalPage() {
           <div className="px-8 py-6">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
+                <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-400">
                   <th className="pb-3">Description</th>
                   <th className="pb-3 text-right">Qty</th>
                   <th className="pb-3 text-right">Unit Price</th>
@@ -151,13 +202,13 @@ export default function PortalPage() {
               </thead>
               <tbody>
                 {invoice.lineItems.map((item, i) => (
-                  <tr key={i} className="border-b border-gray-50">
-                    <td className="py-3 text-gray-700">{item.description}</td>
-                    <td className="py-3 text-right text-gray-500">{item.quantity}</td>
-                    <td className="py-3 text-right text-gray-500">
+                  <tr key={i} className="border-b border-slate-50 last:border-0">
+                    <td className="py-3 text-slate-700">{item.description}</td>
+                    <td className="py-3 text-right text-slate-500">{item.quantity}</td>
+                    <td className="py-3 text-right text-slate-500">
                       {formatCurrency(item.unitPrice, invoice.currency)}
                     </td>
-                    <td className="py-3 text-right font-medium text-gray-900">
+                    <td className="py-3 text-right font-medium text-slate-900">
                       {formatCurrency(item.total, invoice.currency)}
                     </td>
                   </tr>
@@ -166,16 +217,20 @@ export default function PortalPage() {
             </table>
 
             {/* Total */}
-            <div className="mt-4 flex flex-col items-end gap-1">
-              <div className="flex items-center gap-8">
-                <span className="text-sm font-semibold text-gray-700">Total</span>
-                <span className="text-xl font-bold text-gray-900">
+            <div className="mt-6 flex flex-col items-end gap-1.5 border-t border-slate-100 pt-5">
+              <div className="flex items-baseline gap-8">
+                <span className="text-sm font-medium text-slate-500">Total Due</span>
+                <span className="text-3xl font-bold text-slate-900">
                   {formatCurrency(invoice.total, invoice.currency)}
                 </span>
               </div>
               {invoice.nprTotal && invoice.nprRate && (
-                <p className="text-xs text-gray-400">
-                  ≈ {formatCurrency(invoice.nprTotal, "NPR")} at 1 {invoice.currency} = ₨{invoice.nprRate.toFixed(2)}
+                <p className="text-xs text-slate-400">
+                  ≈{" "}
+                  <span className="font-semibold text-amber-600">
+                    {formatCurrency(invoice.nprTotal, "NPR")}
+                  </span>{" "}
+                  at 1 {invoice.currency} = ₨{invoice.nprRate.toFixed(2)}
                 </p>
               )}
             </div>
@@ -183,18 +238,20 @@ export default function PortalPage() {
 
           {/* Notes */}
           {invoice.notes && (
-            <div className="border-t border-gray-100 px-8 py-4">
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Notes</p>
-              <p className="text-sm text-gray-600">{invoice.notes}</p>
+            <div className="border-t border-slate-100 px-8 py-5">
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Notes
+              </p>
+              <p className="text-sm text-slate-600">{invoice.notes}</p>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-between border-t border-gray-100 px-8 py-5">
+          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-8 py-5">
             <PDFDownloadLink
               document={<InvoicePDF {...invoice} />}
               fileName={`${invoice.number}.pdf`}
-              className="flex items-center gap-2 rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 hover:shadow-sm active:scale-[0.98]"
             >
               <Download size={15} />
               Download PDF
@@ -204,23 +261,32 @@ export default function PortalPage() {
               <button
                 onClick={() => markPaid.mutate()}
                 disabled={markPaid.isPending}
-                className="rounded-md bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+                className="cursor-pointer rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-green-700 hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {markPaid.isPending ? "Confirming…" : "Mark as Paid"}
+                {markPaid.isPending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Confirming…
+                  </span>
+                ) : (
+                  "Mark as Paid"
+                )}
               </button>
             )}
           </div>
         </div>
 
+        {/* Error */}
         {markPaid.error && (
-          <p className="mt-3 text-center text-sm text-red-600">
+          <div className="mt-3 flex items-center justify-center gap-2 text-sm text-red-600">
+            <AlertTriangle size={14} />
             {markPaid.error.message}
-          </p>
+          </div>
         )}
 
-        <p className="mt-8 text-center text-xs text-gray-400">
+        <p className="mt-8 text-center text-xs text-slate-400">
           Powered by{" "}
-          <span className="font-medium text-amber-500">हिसाब Hisab</span> —
+          <span className="font-semibold text-amber-500">हिसाब Hisab</span> —
           open-source invoicing for Nepali freelancers
         </p>
       </div>

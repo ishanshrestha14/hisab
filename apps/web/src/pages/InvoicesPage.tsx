@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 
@@ -39,6 +39,13 @@ const STATUS_STYLES: Record<string, string> = {
   OVERDUE: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draft",
+  SENT: "Sent",
+  PAID: "Paid",
+  OVERDUE: "Overdue",
+};
+
 export default function InvoicesPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
@@ -53,10 +60,12 @@ export default function InvoicesPage() {
   const pagination = data?.pagination;
 
   const filtered =
-    activeTab === "ALL" ? invoices : invoices.filter((inv) => inv.status === activeTab);
+    activeTab === "ALL"
+      ? invoices
+      : invoices.filter((inv) => inv.status === activeTab);
 
   return (
-    <div className="p-8">
+    <div className="p-8 animate-in-up">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
@@ -66,7 +75,7 @@ export default function InvoicesPage() {
         </div>
         <Link
           to="/invoices/new"
-          className="flex items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+          className="flex cursor-pointer items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
         >
           <Plus size={16} />
           New invoice
@@ -74,7 +83,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* Status filter tabs */}
-      <div className="mb-4 flex gap-1 border-b border-border">
+      <div className="mb-4 flex gap-0.5 border-b border-border">
         {TABS.map((tab) => {
           const count =
             tab.value === "ALL"
@@ -84,8 +93,11 @@ export default function InvoicesPage() {
           return (
             <button
               key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              onClick={() => {
+                setActiveTab(tab.value);
+                setPage(1);
+              }}
+              className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 -mb-px ${
                 activeTab === tab.value
                   ? "border-brand text-brand"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -93,7 +105,7 @@ export default function InvoicesPage() {
             >
               {tab.label}
               <span
-                className={`rounded-full px-1.5 py-0.5 text-xs ${
+                className={`rounded-full px-1.5 py-0.5 text-xs transition-colors ${
                   activeTab === tab.value
                     ? "bg-brand/10 text-brand"
                     : "bg-muted text-muted-foreground"
@@ -109,21 +121,29 @@ export default function InvoicesPage() {
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
           <div className="space-y-3 p-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-12 animate-pulse rounded bg-muted" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-sm text-muted-foreground">
-              {activeTab === "ALL" ? "No invoices yet." : `No ${activeTab.toLowerCase()} invoices.`}
+          <div className="flex flex-col items-center py-14">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <FileText size={20} className="text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              {activeTab === "ALL" ? "No invoices yet" : `No ${STATUS_LABEL[activeTab]?.toLowerCase()} invoices`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {activeTab === "ALL"
+                ? "Create your first invoice to get started"
+                : `Invoices with "${STATUS_LABEL[activeTab]}" status will appear here`}
             </p>
             {activeTab === "ALL" && (
               <Link
                 to="/invoices/new"
-                className="mt-2 inline-block text-sm text-brand hover:underline"
+                className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
               >
-                Create your first invoice
+                Create invoice
               </Link>
             )}
           </div>
@@ -145,7 +165,7 @@ export default function InvoicesPage() {
                   <tr
                     key={inv.id}
                     onClick={() => navigate(`/invoices/${inv.id}`)}
-                    className="cursor-pointer border-b border-border last:border-0 hover:bg-accent/50"
+                    className="cursor-pointer border-b border-border last:border-0 transition-colors duration-100 hover:bg-accent/50"
                   >
                     <td className="px-6 py-3 font-medium text-foreground">
                       {inv.number}
@@ -157,7 +177,7 @@ export default function InvoicesPage() {
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[inv.status] ?? ""}`}
                       >
-                        {inv.status}
+                        {STATUS_LABEL[inv.status] ?? inv.status}
                       </span>
                     </td>
                     <td className="px-6 py-3 text-muted-foreground">
@@ -181,21 +201,26 @@ export default function InvoicesPage() {
       {pagination && pagination.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Showing {(page - 1) * pagination.limit + 1}–{Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
+            Showing {(page - 1) * pagination.limit + 1}–
+            {Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => p - 1)}
               disabled={page === 1}
-              className="rounded-md border border-border p-1.5 hover:bg-accent disabled:opacity-40"
+              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Previous page"
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="px-1">Page {page} of {pagination.totalPages}</span>
+            <span className="px-1">
+              Page {page} of {pagination.totalPages}
+            </span>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={page === pagination.totalPages}
-              className="rounded-md border border-border p-1.5 hover:bg-accent disabled:opacity-40"
+              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Next page"
             >
               <ChevronRight size={16} />
             </button>
