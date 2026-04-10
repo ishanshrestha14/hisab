@@ -16,6 +16,7 @@ import dashboard from "./routes/dashboard";
 import invoices from "./routes/invoices";
 import exchangeRates from "./routes/exchange-rates";
 import portal from "./routes/portal";
+import profile from "./routes/profile";
 
 const app = new Hono();
 
@@ -65,6 +66,9 @@ app.route("/api/invoices", invoices);
 
 app.use("/api/exchange-rates/*", requireAuth);
 app.route("/api/exchange-rates", exchangeRates);
+
+app.use("/api/profile/*", requireAuth);
+app.route("/api/profile", profile);
 
 // Public portal — no auth
 app.route("/api/portal", portal);

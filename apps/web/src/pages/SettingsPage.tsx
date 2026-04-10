@@ -2,16 +2,24 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { User, Palette, Bell, Shield, AlertCircle, Check } from "lucide-react";
 import { toast } from "sonner";
 import { authClient, useSession } from "@/lib/auth-client";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
 });
 type ProfileInput = z.infer<typeof profileSchema>;
+
+const taxSchema = z.object({
+  pan: z.string().max(20).optional(),
+  vatNumber: z.string().max(20).optional(),
+});
+type TaxInput = z.infer<typeof taxSchema>;
 
 const inputBase =
   "w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-colors duration-150";
@@ -50,6 +58,8 @@ export default function SettingsPage() {
   const { data: session, refetch } = useSession();
   const { theme, toggle } = useTheme();
   const [saved, setSaved] = useState(false);
+  const [taxSaved, setTaxSaved] = useState(false);
+  const queryClient = useQueryClient();
 
   const {
     register,
@@ -61,12 +71,43 @@ export default function SettingsPage() {
     defaultValues: { name: session?.user.name ?? "" },
   });
 
-  // Sync form when session loads
+  const {
+    register: registerTax,
+    handleSubmit: handleSubmitTax,
+    reset: resetTax,
+    formState: { errors: taxErrors, isSubmitting: isTaxSubmitting, isDirty: isTaxDirty },
+  } = useForm<TaxInput>({ resolver: zodResolver(taxSchema) });
+
+  // Sync name form when session loads
   useEffect(() => {
     if (session?.user.name) {
       reset({ name: session.user.name });
     }
   }, [session?.user.name, reset]);
+
+  // Fetch PAN / VAT
+  const { data: taxData } = useQuery<{ pan: string | null; vatNumber: string | null }>({
+    queryKey: ["profile"],
+    queryFn: () => api.get("/api/profile"),
+  });
+
+  // Sync tax form when data loads
+  useEffect(() => {
+    if (taxData) {
+      resetTax({ pan: taxData.pan ?? "", vatNumber: taxData.vatNumber ?? "" });
+    }
+  }, [taxData, resetTax]);
+
+  const updateTax = useMutation({
+    mutationFn: (data: TaxInput) => api.patch("/api/profile", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      setTaxSaved(true);
+      toast.success("Tax info saved");
+      setTimeout(() => setTaxSaved(false), 2500);
+    },
+    onError: () => toast.error("Failed to save tax info"),
+  });
 
   async function onSubmit(data: ProfileInput) {
     try {
@@ -261,29 +302,93 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Business info — coming soon */}
-        <div className="rounded-lg border border-border bg-card p-6 opacity-70">
-          <div className="flex items-start justify-between mb-6">
-            <SectionHeader
-              icon={Shield}
-              title="Business & Tax"
-              description="PAN number, VAT registration, TDS settings for Nepal"
-            />
-            <ComingSoonBadge />
-          </div>
-          <div className="space-y-3 pointer-events-none select-none">
-            {[
-              { label: "PAN Number", placeholder: "12-345-678" },
-              { label: "VAT Registration", placeholder: "123456789" },
-            ].map(({ label, placeholder }) => (
-              <div key={label}>
-                <p className="mb-1.5 text-sm font-medium text-foreground">{label}</p>
-                <div className={cn(inputBase, "border-input opacity-50 cursor-not-allowed bg-muted")}>
-                  <span className="text-muted-foreground">{placeholder}</span>
-                </div>
+        {/* Business & Tax */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <SectionHeader
+            icon={Shield}
+            title="Business & Tax"
+            description="PAN and VAT numbers appear on invoices and the client portal"
+          />
+
+          <form onSubmit={handleSubmitTax((d) => updateTax.mutate(d))} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  PAN Number
+                </label>
+                <input
+                  {...registerTax("pan")}
+                  placeholder="123456789"
+                  className={cn(
+                    inputBase,
+                    taxErrors.pan
+                      ? "border-destructive focus:ring-destructive/30"
+                      : "border-input focus:ring-brand/30"
+                  )}
+                />
+                {taxErrors.pan && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-destructive">
+                    <AlertCircle size={12} />
+                    {taxErrors.pan.message}
+                  </p>
+                )}
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Nepal Permanent Account Number
+                </p>
               </div>
-            ))}
-          </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  VAT Registration
+                </label>
+                <input
+                  {...registerTax("vatNumber")}
+                  placeholder="123456789"
+                  className={cn(
+                    inputBase,
+                    taxErrors.vatNumber
+                      ? "border-destructive focus:ring-destructive/30"
+                      : "border-input focus:ring-brand/30"
+                  )}
+                />
+                {taxErrors.vatNumber && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-destructive">
+                    <AlertCircle size={12} />
+                    {taxErrors.vatNumber.message}
+                  </p>
+                )}
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  VAT registration number (optional)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={isTaxSubmitting || !isTaxDirty}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98]",
+                  taxSaved
+                    ? "bg-green-600 text-white"
+                    : "bg-brand text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+                )}
+              >
+                {taxSaved ? (
+                  <>
+                    <Check size={15} />
+                    Saved
+                  </>
+                ) : isTaxSubmitting ? (
+                  <>
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Saving…
+                  </>
+                ) : (
+                  "Save changes"
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

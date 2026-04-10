@@ -31,6 +31,8 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  pan           String?   // Nepal PAN number (e.g. "123456789")
+  vatNumber     String?   // Nepal VAT registration number
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

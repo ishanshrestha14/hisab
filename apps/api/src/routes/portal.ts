@@ -37,7 +37,7 @@ portal.get("/:token", viewLimiter, async (c) => {
         select: { name: true, email: true, company: true, country: true },
       },
       lineItems: true,
-      user: { select: { name: true, email: true } },
+      user: { select: { name: true, email: true, pan: true, vatNumber: true } },
     },
   });
 
@@ -64,7 +64,12 @@ portal.get("/:token", viewLimiter, async (c) => {
     nprRate,
     nprTotal: nprRate ? total * nprRate : null,
     client: invoice.client,
-    freelancer: invoice.user,
+    freelancer: {
+      name: invoice.user.name,
+      email: invoice.user.email,
+      pan: invoice.user.pan,
+      vatNumber: invoice.user.vatNumber,
+    },
     lineItems: invoice.lineItems,
   });
 });

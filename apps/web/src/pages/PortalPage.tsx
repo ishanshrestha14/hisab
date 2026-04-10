@@ -154,6 +154,12 @@ export default function PortalPage() {
               </p>
               <p className="font-medium text-slate-900">{invoice.freelancer.name}</p>
               <p className="text-sm text-slate-500">{invoice.freelancer.email}</p>
+              {invoice.freelancer.pan && (
+                <p className="text-sm text-slate-500">PAN: {invoice.freelancer.pan}</p>
+              )}
+              {invoice.freelancer.vatNumber && (
+                <p className="text-sm text-slate-500">VAT: {invoice.freelancer.vatNumber}</p>
+              )}
             </div>
             <div>
               <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">

@@ -40,6 +40,23 @@ export const updateInvoiceStatusSchema = z.object({
   status: InvoiceStatusEnum,
 });
 
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+export const updateProfileSchema = z.object({
+  pan: z
+    .string()
+    .max(20)
+    .optional()
+    .nullable()
+    .transform((v) => v || null),
+  vatNumber: z
+    .string()
+    .max(20)
+    .optional()
+    .nullable()
+    .transform((v) => v || null),
+});
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const signUpSchema = z.object({
@@ -62,5 +79,6 @@ export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
 export type LineItemInput = z.infer<typeof lineItemSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type Currency = z.infer<typeof CurrencyEnum>;
 export type InvoiceStatus = z.infer<typeof InvoiceStatusEnum>;

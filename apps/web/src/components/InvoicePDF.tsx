@@ -210,7 +210,7 @@ export interface InvoicePDFProps {
     company?: string | null;
     country?: string | null;
   };
-  freelancer: { name: string; email: string };
+  freelancer: { name: string; email: string; pan?: string | null; vatNumber?: string | null };
   lineItems: { description: string; quantity: number; unitPrice: number; total: number }[];
 }
 
@@ -256,6 +256,12 @@ export function InvoicePDF({
             <Text style={s.metaLabel}>From</Text>
             <Text style={s.metaValueBold}>{freelancer.name}</Text>
             <Text style={s.metaValue}>{freelancer.email}</Text>
+            {freelancer.pan && (
+              <Text style={s.metaValue}>PAN: {freelancer.pan}</Text>
+            )}
+            {freelancer.vatNumber && (
+              <Text style={s.metaValue}>VAT: {freelancer.vatNumber}</Text>
+            )}
           </View>
           <View style={s.metaBlock}>
             <Text style={s.metaLabel}>Bill To</Text>
