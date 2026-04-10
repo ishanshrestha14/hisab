@@ -18,8 +18,94 @@ type ProfileInput = z.infer<typeof profileSchema>;
 const taxSchema = z.object({
   pan: z.string().max(20).optional(),
   vatNumber: z.string().max(20).optional(),
+  logoUrl: z.string().url("Must be a valid URL").or(z.literal("")).optional(),
+  invoiceTemplate: z.enum(["classic", "modern", "minimal"]).optional(),
+  brandColor: z.string().optional(),
 });
 type TaxInput = z.infer<typeof taxSchema>;
+
+const TEMPLATES = [
+  {
+    id: "classic" as const,
+    label: "Classic",
+    description: "Clean and timeless",
+    preview: (color: string) => (
+      <div className="h-16 w-full rounded-sm overflow-hidden bg-white border border-slate-100">
+        <div className="flex justify-between items-start p-2">
+          <div className="space-y-0.5">
+            <div className="h-1.5 w-12 rounded-full" style={{ backgroundColor: color }} />
+            <div className="h-1 w-8 rounded-full bg-slate-200" />
+          </div>
+          <div className="text-right space-y-0.5">
+            <div className="h-1.5 w-10 rounded-full bg-slate-300" />
+            <div className="h-1 w-7 rounded-full bg-slate-200" />
+          </div>
+        </div>
+        <div className="mx-2 mt-1 space-y-1">
+          <div className="h-1 w-full rounded-full bg-slate-100" />
+          <div className="h-1 w-full rounded-full bg-slate-50" />
+          <div className="h-1 w-3/4 rounded-full bg-slate-50" />
+        </div>
+        <div className="flex justify-end mx-2 mt-1.5">
+          <div className="h-1.5 w-10 rounded-full" style={{ backgroundColor: color, opacity: 0.7 }} />
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "modern" as const,
+    label: "Modern",
+    description: "Bold and contemporary",
+    preview: (color: string) => (
+      <div className="h-16 w-full rounded-sm overflow-hidden bg-white border border-slate-100">
+        <div className="h-6 px-2 py-1.5 flex justify-between items-center" style={{ backgroundColor: color }}>
+          <div className="h-1.5 w-10 rounded-full bg-white opacity-80" />
+          <div className="h-2 w-6 rounded-full bg-white opacity-90" />
+        </div>
+        <div className="mx-2 mt-2 flex gap-1">
+          <div className="flex-1 h-3 rounded-sm bg-slate-50 border border-slate-100" />
+          <div className="flex-1 h-3 rounded-sm bg-slate-50 border border-slate-100" />
+        </div>
+        <div className="mx-2 mt-1.5 flex justify-end">
+          <div className="h-3 w-14 rounded-sm" style={{ backgroundColor: color, opacity: 0.85 }} />
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "minimal" as const,
+    label: "Minimal",
+    description: "Clean typography",
+    preview: (_color: string) => (
+      <div className="h-16 w-full rounded-sm overflow-hidden bg-white border border-slate-100">
+        <div className="flex justify-between items-start p-2 pb-1.5">
+          <div className="h-2 w-10 rounded-full bg-slate-800" />
+          <div className="text-right space-y-0.5">
+            <div className="h-1 w-8 rounded-full bg-slate-300" />
+            <div className="h-1.5 w-6 rounded-full bg-slate-700" />
+          </div>
+        </div>
+        <div className="mx-2 border-t border-slate-300 pt-1.5 space-y-1">
+          <div className="h-1 w-full rounded-full bg-slate-100" />
+          <div className="h-1 w-full rounded-full bg-slate-50" />
+        </div>
+        <div className="mx-2 mt-1.5 border-t border-slate-700 pt-1 flex justify-between">
+          <div className="h-1.5 w-6 rounded-full bg-slate-700" />
+          <div className="h-1.5 w-8 rounded-full bg-slate-700" />
+        </div>
+      </div>
+    ),
+  },
+] as const;
+
+const COLOR_PRESETS = [
+  { label: "Amber", value: "#f59e0b" },
+  { label: "Blue", value: "#3b82f6" },
+  { label: "Emerald", value: "#10b981" },
+  { label: "Violet", value: "#8b5cf6" },
+  { label: "Rose", value: "#f43f5e" },
+  { label: "Slate", value: "#64748b" },
+];
 
 const inputBase =
   "w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-colors duration-150";
@@ -75,8 +161,13 @@ export default function SettingsPage() {
     register: registerTax,
     handleSubmit: handleSubmitTax,
     reset: resetTax,
+    watch: watchTax,
+    setValue: setTaxValue,
     formState: { errors: taxErrors, isSubmitting: isTaxSubmitting, isDirty: isTaxDirty },
   } = useForm<TaxInput>({ resolver: zodResolver(taxSchema) });
+
+  const selectedTemplate = watchTax("invoiceTemplate") ?? "classic";
+  const selectedColor = watchTax("brandColor") ?? "#f59e0b";
 
   // Sync name form when session loads
   useEffect(() => {
@@ -86,7 +177,7 @@ export default function SettingsPage() {
   }, [session?.user.name, reset]);
 
   // Fetch PAN / VAT
-  const { data: taxData } = useQuery<{ pan: string | null; vatNumber: string | null }>({
+  const { data: taxData } = useQuery<{ pan: string | null; vatNumber: string | null; logoUrl: string | null; invoiceTemplate: string; brandColor: string }>({
     queryKey: ["profile"],
     queryFn: () => api.get("/api/profile"),
   });
@@ -94,7 +185,13 @@ export default function SettingsPage() {
   // Sync tax form when data loads
   useEffect(() => {
     if (taxData) {
-      resetTax({ pan: taxData.pan ?? "", vatNumber: taxData.vatNumber ?? "" });
+      resetTax({
+        pan: taxData.pan ?? "",
+        vatNumber: taxData.vatNumber ?? "",
+        logoUrl: taxData.logoUrl ?? "",
+        invoiceTemplate: (taxData.invoiceTemplate as TaxInput["invoiceTemplate"]) ?? "classic",
+        brandColor: taxData.brandColor ?? "#f59e0b",
+      });
     }
   }, [taxData, resetTax]);
 
@@ -310,7 +407,8 @@ export default function SettingsPage() {
             description="PAN and VAT numbers appear on invoices and the client portal"
           />
 
-          <form onSubmit={handleSubmitTax((d) => updateTax.mutate(d))} className="space-y-4">
+          <form onSubmit={handleSubmitTax((d) => updateTax.mutate(d))} className="space-y-6">
+            {/* PAN + VAT */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
@@ -332,9 +430,7 @@ export default function SettingsPage() {
                     {taxErrors.pan.message}
                   </p>
                 )}
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Nepal Permanent Account Number
-                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">Nepal Permanent Account Number</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
@@ -356,9 +452,89 @@ export default function SettingsPage() {
                     {taxErrors.vatNumber.message}
                   </p>
                 )}
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  VAT registration number (optional)
+                <p className="mt-1.5 text-xs text-muted-foreground">VAT registration number (optional)</p>
+              </div>
+            </div>
+
+            {/* Logo URL */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Logo URL
+              </label>
+              <input
+                {...registerTax("logoUrl")}
+                placeholder="https://example.com/logo.png"
+                className={cn(
+                  inputBase,
+                  taxErrors.logoUrl
+                    ? "border-destructive focus:ring-destructive/30"
+                    : "border-input focus:ring-brand/30"
+                )}
+              />
+              {taxErrors.logoUrl && (
+                <p className="mt-1.5 flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle size={12} />
+                  {taxErrors.logoUrl.message}
                 </p>
+              )}
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Publicly accessible image URL — shown on invoices instead of the Hisab wordmark
+              </p>
+            </div>
+
+            {/* Invoice template */}
+            <div>
+              <p className="mb-3 text-sm font-medium text-foreground">Invoice Template</p>
+              <div className="grid grid-cols-3 gap-3">
+                {TEMPLATES.map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => setTaxValue("invoiceTemplate", tmpl.id, { shouldDirty: true })}
+                    className={cn(
+                      "cursor-pointer rounded-lg border-2 p-3 text-left transition-all duration-150",
+                      selectedTemplate === tmpl.id
+                        ? "border-brand bg-brand/5"
+                        : "border-border hover:border-muted-foreground/30"
+                    )}
+                  >
+                    {tmpl.preview(selectedColor)}
+                    <div className="mt-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{tmpl.label}</p>
+                        <p className="text-xs text-muted-foreground">{tmpl.description}</p>
+                      </div>
+                      {selectedTemplate === tmpl.id && (
+                        <Check size={14} className="text-brand shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Brand color */}
+            <div>
+              <p className="mb-3 text-sm font-medium text-foreground">Accent Color</p>
+              <div className="flex items-center gap-3">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    title={preset.label}
+                    onClick={() => setTaxValue("brandColor", preset.value, { shouldDirty: true })}
+                    className={cn(
+                      "h-8 w-8 cursor-pointer rounded-full border-2 transition-all duration-150",
+                      selectedColor === preset.value
+                        ? "border-foreground scale-110 shadow-md"
+                        : "border-transparent hover:scale-105"
+                    )}
+                    style={{ backgroundColor: preset.value }}
+                  />
+                ))}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {COLOR_PRESETS.find((p) => p.value === selectedColor)?.label ?? "Custom"}
+                </span>
               </div>
             </div>
 

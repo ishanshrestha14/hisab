@@ -23,6 +23,21 @@ enum InvoiceStatus {
   OVERDUE
 }
 
+enum RecurrenceInterval {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  CONVERTED
+}
+
 // ─── Better Auth required tables ──────────────────────────────────────────────
 
 model User {
@@ -31,18 +46,23 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
-  pan           String?   // Nepal PAN number (e.g. "123456789")
-  vatNumber     String?   // Nepal VAT registration number
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  pan              String?   // Nepal PAN number (e.g. "123456789")
+  vatNumber        String?   // Nepal VAT registration number
+  logoUrl          String?   // URL to user's business logo for invoices
+  invoiceTemplate  String    @default("classic") // "classic" | "modern" | "minimal"
+  brandColor       String    @default("#f59e0b")  // hex accent color for PDF
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   sessions      Session[]
   accounts      Account[]
 
-  clients          Client[]
-  invoices         Invoice[]
-  auditLogs        AuditLog[]
-  idempotencyKeys  IdempotencyKey[]
+  clients            Client[]
+  invoices           Invoice[]
+  quotes             Quote[]
+  recurringInvoices  RecurringInvoice[]
+  auditLogs          AuditLog[]
+  idempotencyKeys    IdempotencyKey[]
 }
 
 model Session {
@@ -102,8 +122,10 @@ model Client {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  invoices Invoice[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices          Invoice[]
+  quotes            Quote[]
+  recurringInvoices RecurringInvoice[]
 
   @@index([userId])
 }
@@ -128,6 +150,7 @@ model Invoice {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   client    Client     @relation(fields: [clientId], references: [id])
   lineItems LineItem[]
+  quote     Quote?
 
   @@unique([userId, number])
   @@index([userId, status])
@@ -151,6 +174,79 @@ model LineItem {
 }
 
 // ─── Audit log ────────────────────────────────────────────────────────────────
+
+model RecurringInvoice {
+  id          String              @id @default(cuid())
+  userId      String
+  clientId    String
+  currency    Currency            @default(USD)
+  interval    RecurrenceInterval
+  nextRunAt   DateTime            // when the next invoice should be generated
+  daysBefore  Int                 @default(0) // due date = nextRunAt + daysBefore
+  notes       String?
+  active      Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  user      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client    Client                    @relation(fields: [clientId], references: [id])
+  lineItems RecurringInvoiceLineItem[]
+
+  @@index([userId])
+  @@index([nextRunAt, active])
+}
+
+model RecurringInvoiceLineItem {
+  id                  String           @id @default(cuid())
+  recurringInvoiceId  String
+  description         String
+  quantity            Float
+  unitPrice           Float
+  total               Float
+
+  recurringInvoice RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([recurringInvoiceId])
+}
+
+model Quote {
+  id         String      @id @default(cuid())
+  userId     String
+  clientId   String
+  number     String      // e.g. "QT-0001"
+  status     QuoteStatus @default(DRAFT)
+  currency   Currency    @default(USD)
+  issueDate  DateTime    @default(now())
+  expiryDate DateTime
+  notes      String?
+  // Set when converted to invoice
+  invoiceId  String?     @unique
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client    Client     @relation(fields: [clientId], references: [id])
+  lineItems QuoteLineItem[]
+  invoice   Invoice?   @relation(fields: [invoiceId], references: [id])
+
+  @@unique([userId, number])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([clientId])
+}
+
+model QuoteLineItem {
+  id          String @id @default(cuid())
+  quoteId     String
+  description String
+  quantity    Float
+  unitPrice   Float
+  total       Float
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
+}
 
 model AuditLog {
   id         String   @id @default(cuid())
