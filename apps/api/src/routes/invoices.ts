@@ -60,7 +60,7 @@ invoices.get("/:id", async (c) => {
     include: {
       client: { select: { name: true, email: true, company: true, country: true } },
       lineItems: true,
-      user: { select: { name: true, email: true, pan: true, vatNumber: true } },
+      user: { select: { name: true, email: true, pan: true, vatNumber: true, logoUrl: true, invoiceTemplate: true, brandColor: true } },
     },
   });
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
@@ -78,6 +78,9 @@ invoices.get("/:id", async (c) => {
     total,
     nprRate,
     nprTotal: nprRate ? total * nprRate : null,
+    template: invoice.user.invoiceTemplate,
+    brandColor: invoice.user.brandColor,
+    logoUrl: invoice.user.logoUrl,
     freelancer: {
       name: invoice.user.name,
       email: invoice.user.email,

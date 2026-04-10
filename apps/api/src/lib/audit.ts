@@ -6,7 +6,12 @@ export type AuditAction =
   | "invoice.updated"
   | "invoice.deleted"
   | "invoice.status_changed"
-  | "invoice.sent";
+  | "invoice.sent"
+  | "quote.created"
+  | "quote.updated"
+  | "quote.deleted"
+  | "quote.status_changed"
+  | "quote.converted";
 
 // Fire-and-forget — audit failures are logged but never block the user request.
 export function audit(params: {

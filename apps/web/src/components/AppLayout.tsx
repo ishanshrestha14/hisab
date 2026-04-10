@@ -3,6 +3,8 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  ClipboardList,
+  RefreshCw,
   LogOut,
   Sun,
   Moon,
@@ -19,6 +21,8 @@ const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/clients", icon: Users, label: "Clients" },
   { to: "/invoices", icon: FileText, label: "Invoices" },
+  { to: "/quotes", icon: ClipboardList, label: "Quotes" },
+  { to: "/recurring", icon: RefreshCw, label: "Recurring" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

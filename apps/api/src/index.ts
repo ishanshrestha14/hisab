@@ -17,6 +17,8 @@ import invoices from "./routes/invoices";
 import exchangeRates from "./routes/exchange-rates";
 import portal from "./routes/portal";
 import profile from "./routes/profile";
+import quotes from "./routes/quotes";
+import recurring from "./routes/recurring";
 
 const app = new Hono();
 
@@ -69,6 +71,12 @@ app.route("/api/exchange-rates", exchangeRates);
 
 app.use("/api/profile/*", requireAuth);
 app.route("/api/profile", profile);
+
+app.use("/api/quotes/*", requireAuth);
+app.route("/api/quotes", quotes);
+
+app.use("/api/recurring/*", requireAuth);
+app.route("/api/recurring", recurring);
 
 // Public portal — no auth
 app.route("/api/portal", portal);
