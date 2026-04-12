@@ -160,18 +160,17 @@ Goal: become the go-to open-source invoicing tool for Nepali freelancers and sma
 
 ### Phase 1 — Close the basics gap
 
-- [ ] **PDF invoice templates** — multiple designs, logo upload, customizable colors
-- [ ] **PAN / VAT number** — add fields to User profile and render on PDF/portal
-- [ ] **Quotes / Estimates** — create a quote, convert to invoice in one click
-- [ ] **Recurring invoices** — weekly/monthly auto-generation with cron
+- [x] **PDF invoice templates** — multiple designs, logo upload, customizable colors
+- [x] **PAN / VAT number** — add fields to User profile and render on PDF/portal
+- [x] **Quotes / Estimates** — create a quote, convert to invoice in one click
+- [x] **Recurring invoices** — weekly/monthly auto-generation with cron
 
 ### Phase 2 — Nepal moat (nobody else does this)
 
-- [ ] **TDS tracking** — per-invoice TDS amount withheld by client (15% standard rate); show net receivable vs gross
+- [x] **TDS tracking** — per-invoice TDS amount withheld by client (15% standard rate); show net receivable vs gross
 - [ ] **eSewa / Khalti / ConnectIPS payment links** — generate a payment link on the portal so Nepali clients can pay directly
-- [ ] **Nepali fiscal year reports** — revenue summary aligned to Shrawan–Ashad (mid-July to mid-July)
-- [ ] **IRD-compatible invoice format** — layout and fields required by Nepal's Inland Revenue Department
-
+- [x] **Nepali fiscal year reports** — revenue summary aligned to Shrawan–Ashad (mid-July to mid-July)
+- [ ] **IRD-compatible invoice format** — layout and fields required by  
 ### Phase 3 — Compete on UX
 
 - [ ] **Client statement page** — all invoices for a client in one view, downloadable

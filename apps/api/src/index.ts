@@ -19,6 +19,7 @@ import portal from "./routes/portal";
 import profile from "./routes/profile";
 import quotes from "./routes/quotes";
 import recurring from "./routes/recurring";
+import reports from "./routes/reports";
 
 const app = new Hono();
 
@@ -77,6 +78,9 @@ app.route("/api/quotes", quotes);
 
 app.use("/api/recurring/*", requireAuth);
 app.route("/api/recurring", recurring);
+
+app.use("/api/reports/*", requireAuth);
+app.route("/api/reports", reports);
 
 // Public portal — no auth
 app.route("/api/portal", portal);
