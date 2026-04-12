@@ -87,7 +87,7 @@ export const updateQuoteStatusSchema = z.object({
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-export const InvoiceTemplateEnum = z.enum(["classic", "modern", "minimal"]);
+export const InvoiceTemplateEnum = z.enum(["classic", "modern", "minimal", "ird"]);
 
 export const updateProfileSchema = z.object({
   pan: z

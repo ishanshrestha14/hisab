@@ -8,6 +8,7 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import { formatCurrency } from "@/lib/utils";
+import { adToBS, formatBS } from "@/lib/bs-date";
 
 Font.register({
   family: "Inter",
@@ -472,6 +473,288 @@ function MinimalTemplate({ number, currency, issueDate, dueDate, notes, total, t
   );
 }
 
+// ─── IRD Template ─────────────────────────────────────────────────────────────
+// IRD-compatible "Tax Invoice / कर बिल" format for Nepal Inland Revenue Dept.
+// Includes BS date, serial numbers, VAT line (if vatNumber set), amount in words,
+// and an authorized signature block.
+
+const ONES = [
+  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+  "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+  "Seventeen", "Eighteen", "Nineteen",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+function toWords(n: number): string {
+  if (n === 0) return "";
+  if (n < 20) return ONES[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? " " + ONES[n % 10] : "");
+  if (n < 1_000) return ONES[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + toWords(n % 100) : "");
+  if (n < 1_00_000) return toWords(Math.floor(n / 1_000)) + " Thousand" + (n % 1_000 ? " " + toWords(n % 1_000) : "");
+  if (n < 1_00_00_000) return toWords(Math.floor(n / 1_00_000)) + " Lakh" + (n % 1_00_000 ? " " + toWords(n % 1_00_000) : "");
+  return toWords(Math.floor(n / 1_00_00_000)) + " Crore" + (n % 1_00_00_000 ? " " + toWords(n % 1_00_00_000) : "");
+}
+
+function amountInWords(amount: number, currency: string): string {
+  const whole = Math.floor(Math.abs(amount));
+  const cents = Math.round((Math.abs(amount) - whole) * 100);
+  const currencyNames: Record<string, string> = {
+    USD: "US Dollars", GBP: "British Pounds", EUR: "Euros", NPR: "Nepalese Rupees",
+  };
+  const subunit = currency === "NPR" ? "Paisa" : "Cents";
+  const currencyName = currencyNames[currency] ?? currency;
+  const wholeWords = whole === 0 ? "Zero" : toWords(whole);
+  return cents > 0
+    ? `${wholeWords} ${currencyName} and ${toWords(cents)} ${subunit} Only`
+    : `${wholeWords} ${currencyName} Only`;
+}
+
+const ird = StyleSheet.create({
+  page:           { fontFamily: "Inter", fontSize: 10, color: "#111827", padding: 40, backgroundColor: "#ffffff" },
+  // Header
+  titleBlock:     { alignItems: "center", marginBottom: 16 },
+  titleMain:      { fontSize: 16, fontWeight: 600, color: "#111827", letterSpacing: 1 },
+  titleSub:       { fontSize: 13, color: "#374151", marginTop: 2 },
+  titleRule:      { borderBottomWidth: 2, borderBottomColor: "#111827", marginTop: 8, marginBottom: 12 },
+  // Meta grid
+  metaGrid:       { flexDirection: "row", gap: 0, marginBottom: 12 },
+  metaLeft:       { flex: 1, paddingRight: 12 },
+  metaRight:      { width: 200 },
+  metaBox:        { borderWidth: 1, borderColor: "#d1d5db", borderRadius: 4, padding: 10, marginBottom: 6 },
+  metaBoxTitle:   { fontSize: 8, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 },
+  metaRow:        { flexDirection: "row", marginBottom: 3 },
+  metaLabel:      { width: 72, fontSize: 9, color: "#6b7280" },
+  metaValue:      { flex: 1, fontSize: 9, color: "#111827", fontWeight: 600 },
+  metaValueNorm:  { flex: 1, fontSize: 9, color: "#111827" },
+  // Table
+  tableRule:      { borderBottomWidth: 1.5, borderBottomColor: "#111827", marginBottom: 0 },
+  tableHeader:    { flexDirection: "row", paddingVertical: 7, paddingHorizontal: 6, backgroundColor: "#f3f4f6" },
+  tableRow:       { flexDirection: "row", paddingVertical: 7, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  thText:         { fontSize: 8, fontWeight: 600, color: "#374151", textTransform: "uppercase" },
+  tdText:         { fontSize: 9, color: "#374151" },
+  colSN:          { width: 24 },
+  colDesc:        { flex: 1 },
+  colQty:         { width: 40, textAlign: "right" },
+  colRate:        { width: 70, textAlign: "right" },
+  colAmt:         { width: 80, textAlign: "right" },
+  // Totals
+  totalsSection:  { marginTop: 4, alignItems: "flex-end" },
+  totalRow:       { flexDirection: "row", paddingVertical: 3, paddingHorizontal: 6 },
+  totalLabel:     { width: 120, fontSize: 9, color: "#374151", textAlign: "right", paddingRight: 12 },
+  totalValue:     { width: 80, fontSize: 9, color: "#111827", textAlign: "right" },
+  grandRule:      { borderTopWidth: 1.5, borderTopColor: "#111827", width: 206, marginTop: 2, marginBottom: 2 },
+  grandLabel:     { width: 120, fontSize: 10, fontWeight: 600, color: "#111827", textAlign: "right", paddingRight: 12 },
+  grandValue:     { width: 80, fontSize: 10, fontWeight: 600, color: "#111827", textAlign: "right" },
+  // Amount in words
+  wordsBox:       { borderWidth: 1, borderColor: "#d1d5db", borderRadius: 4, padding: 8, marginTop: 12 },
+  wordsLabel:     { fontSize: 8, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 },
+  wordsText:      { fontSize: 9, color: "#111827", fontWeight: 600 },
+  // Notes
+  notesBox:       { marginTop: 8, padding: 8, backgroundColor: "#f9fafb", borderRadius: 4 },
+  notesLabel:     { fontSize: 8, color: "#9ca3af", textTransform: "uppercase", marginBottom: 3 },
+  notesText:      { fontSize: 9, color: "#374151", lineHeight: 1.5 },
+  // Signature
+  sigSection:     { flexDirection: "row", justifyContent: "space-between", marginTop: 32 },
+  sigBlock:       { width: 160, borderTopWidth: 1, borderTopColor: "#9ca3af", paddingTop: 4 },
+  sigLabel:       { fontSize: 8, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 },
+  // NPR note
+  nprNote:        { fontSize: 8, color: "#9ca3af", textAlign: "right", marginTop: 3 },
+  // Footer
+  footer:         { position: "absolute", bottom: 24, left: 40, right: 40, textAlign: "center", fontSize: 8, color: "#d1d5db" },
+});
+
+function IRDTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPercent, tdsAmount, netReceivable, nprRate, nprTotal, client, freelancer, lineItems, logoUrl }: InvoicePDFProps) {
+  const bs = adToBS(new Date(issueDate));
+  const bsStr = bs ? formatBS(bs) : "";
+  const adStr = new Date(issueDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const dueDateStr = new Date(dueDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  // VAT (13%) only shown if freelancer has a VAT number
+  const showVAT = !!freelancer.vatNumber;
+  const vatAmount = showVAT ? total * 0.13 : 0;
+  const grandTotal = showVAT ? total + vatAmount : total;
+
+  // TDS is shown if set (uses tdsPercent/tdsAmount/netReceivable passed in)
+  const showTDS = (tdsPercent ?? 0) > 0 && tdsAmount != null;
+  const finalNet = showTDS ? (netReceivable ?? grandTotal) : grandTotal;
+
+  const wordsTotal = showTDS ? finalNet : grandTotal;
+
+  const isVATInvoice = showVAT;
+  const docTitle = isVATInvoice ? "TAX INVOICE" : "INVOICE";
+  const docTitleNP = isVATInvoice ? "कर बिल" : "बिल";
+
+  return (
+    <>
+      {/* Title */}
+      <View style={ird.titleBlock}>
+        {logoUrl && <Image src={logoUrl} style={{ width: 80, height: 40, objectFit: "contain", marginBottom: 6 }} />}
+        <Text style={ird.titleMain}>{docTitle}</Text>
+        <Text style={ird.titleSub}>{docTitleNP}</Text>
+      </View>
+      <View style={ird.titleRule} />
+
+      {/* Meta grid */}
+      <View style={ird.metaGrid}>
+        {/* Left: supplier + customer */}
+        <View style={ird.metaLeft}>
+          <View style={ird.metaBox}>
+            <Text style={ird.metaBoxTitle}>Supplier / आपूर्तिकर्ता</Text>
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Name:</Text>
+              <Text style={ird.metaValue}>{freelancer.name}</Text>
+            </View>
+            {freelancer.pan && (
+              <View style={ird.metaRow}>
+                <Text style={ird.metaLabel}>PAN:</Text>
+                <Text style={ird.metaValue}>{freelancer.pan}</Text>
+              </View>
+            )}
+            {freelancer.vatNumber && (
+              <View style={ird.metaRow}>
+                <Text style={ird.metaLabel}>VAT No:</Text>
+                <Text style={ird.metaValue}>{freelancer.vatNumber}</Text>
+              </View>
+            )}
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Email:</Text>
+              <Text style={ird.metaValueNorm}>{freelancer.email}</Text>
+            </View>
+          </View>
+
+          <View style={ird.metaBox}>
+            <Text style={ird.metaBoxTitle}>Customer / ग्राहक</Text>
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Name:</Text>
+              <Text style={ird.metaValue}>{client.name}</Text>
+            </View>
+            {client.company && (
+              <View style={ird.metaRow}>
+                <Text style={ird.metaLabel}>Company:</Text>
+                <Text style={ird.metaValueNorm}>{client.company}</Text>
+              </View>
+            )}
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Email:</Text>
+              <Text style={ird.metaValueNorm}>{client.email}</Text>
+            </View>
+            {client.country && (
+              <View style={ird.metaRow}>
+                <Text style={ird.metaLabel}>Country:</Text>
+                <Text style={ird.metaValueNorm}>{client.country}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Right: invoice details */}
+        <View style={ird.metaRight}>
+          <View style={ird.metaBox}>
+            <Text style={ird.metaBoxTitle}>Invoice Details</Text>
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Invoice No:</Text>
+              <Text style={ird.metaValue}>{number}</Text>
+            </View>
+            {bsStr ? (
+              <View style={ird.metaRow}>
+                <Text style={ird.metaLabel}>Date (BS):</Text>
+                <Text style={ird.metaValue}>{bsStr}</Text>
+              </View>
+            ) : null}
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Date (AD):</Text>
+              <Text style={ird.metaValueNorm}>{adStr}</Text>
+            </View>
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Due Date:</Text>
+              <Text style={ird.metaValueNorm}>{dueDateStr}</Text>
+            </View>
+            <View style={ird.metaRow}>
+              <Text style={ird.metaLabel}>Currency:</Text>
+              <Text style={ird.metaValue}>{currency}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Line items table */}
+      <View style={ird.tableRule} />
+      <View style={ird.tableHeader}>
+        <Text style={[ird.thText, ird.colSN]}>S.N.</Text>
+        <Text style={[ird.thText, ird.colDesc]}>Description of Services</Text>
+        <Text style={[ird.thText, ird.colQty]}>Qty</Text>
+        <Text style={[ird.thText, ird.colRate]}>Rate</Text>
+        <Text style={[ird.thText, ird.colAmt]}>Amount</Text>
+      </View>
+      {lineItems.map((item, i) => (
+        <View key={i} style={ird.tableRow}>
+          <Text style={[ird.tdText, ird.colSN]}>{i + 1}</Text>
+          <Text style={[ird.tdText, ird.colDesc]}>{item.description}</Text>
+          <Text style={[ird.tdText, ird.colQty]}>{item.quantity}</Text>
+          <Text style={[ird.tdText, ird.colRate]}>{formatCurrency(item.unitPrice, currency)}</Text>
+          <Text style={[ird.tdText, ird.colAmt]}>{formatCurrency(item.total, currency)}</Text>
+        </View>
+      ))}
+
+      {/* Totals */}
+      <View style={ird.totalsSection}>
+        <View style={ird.totalRow}>
+          <Text style={ird.totalLabel}>Sub-total</Text>
+          <Text style={ird.totalValue}>{formatCurrency(total, currency)}</Text>
+        </View>
+        {showVAT && (
+          <View style={ird.totalRow}>
+            <Text style={ird.totalLabel}>VAT (13%)</Text>
+            <Text style={ird.totalValue}>{formatCurrency(vatAmount, currency)}</Text>
+          </View>
+        )}
+        {showTDS && tdsAmount != null && (
+          <View style={ird.totalRow}>
+            <Text style={[ird.totalLabel, { color: "#ef4444" }]}>TDS ({tdsPercent}%) withheld</Text>
+            <Text style={[ird.totalValue, { color: "#ef4444" }]}>−{formatCurrency(tdsAmount, currency)}</Text>
+          </View>
+        )}
+        <View style={ird.grandRule} />
+        <View style={[ird.totalRow]}>
+          <Text style={ird.grandLabel}>{showTDS ? "Net Receivable" : "Total"}</Text>
+          <Text style={ird.grandValue}>{formatCurrency(wordsTotal, currency)}</Text>
+        </View>
+        {nprTotal && nprRate && (
+          <Text style={ird.nprNote}>
+            ≈ {formatCurrency(nprTotal, "NPR")} at 1 {currency} = ₨{nprRate.toFixed(2)}
+          </Text>
+        )}
+      </View>
+
+      {/* Amount in words */}
+      <View style={ird.wordsBox}>
+        <Text style={ird.wordsLabel}>Amount in Words</Text>
+        <Text style={ird.wordsText}>{amountInWords(wordsTotal, currency)}</Text>
+      </View>
+
+      {/* Notes */}
+      {notes && (
+        <View style={ird.notesBox}>
+          <Text style={ird.notesLabel}>Notes / Remarks</Text>
+          <Text style={ird.notesText}>{notes}</Text>
+        </View>
+      )}
+
+      {/* Signature block */}
+      <View style={ird.sigSection}>
+        <View style={ird.sigBlock}>
+          <Text style={ird.sigLabel}>Prepared by</Text>
+        </View>
+        <View style={ird.sigBlock}>
+          <Text style={ird.sigLabel}>Authorized Signature &amp; Stamp</Text>
+        </View>
+      </View>
+
+      <Text style={ird.footer}>Generated by Hisab — open-source invoicing for Nepali freelancers</Text>
+    </>
+  );
+}
+
 // ─── Main export ───────────────────────────────────────────────────────────────
 
 export function InvoicePDF(props: InvoicePDFProps) {
@@ -483,6 +766,8 @@ export function InvoicePDF(props: InvoicePDFProps) {
           <ModernTemplate {...props} />
         ) : t === "minimal" ? (
           <MinimalTemplate {...props} />
+        ) : t === "ird" ? (
+          <IRDTemplate {...props} />
         ) : (
           <ClassicTemplate {...props} />
         )}

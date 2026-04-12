@@ -19,7 +19,7 @@ const taxSchema = z.object({
   pan: z.string().max(20).optional(),
   vatNumber: z.string().max(20).optional(),
   logoUrl: z.string().url("Must be a valid URL").or(z.literal("")).optional(),
-  invoiceTemplate: z.enum(["classic", "modern", "minimal"]).optional(),
+  invoiceTemplate: z.enum(["classic", "modern", "minimal", "ird"]).optional(),
   brandColor: z.string().optional(),
 });
 type TaxInput = z.infer<typeof taxSchema>;
@@ -92,6 +92,32 @@ const TEMPLATES = [
         <div className="mx-2 mt-1.5 border-t border-slate-700 pt-1 flex justify-between">
           <div className="h-1.5 w-6 rounded-full bg-slate-700" />
           <div className="h-1.5 w-8 rounded-full bg-slate-700" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "ird" as const,
+    label: "IRD",
+    description: "Nepal tax invoice",
+    preview: (_color: string) => (
+      <div className="h-16 w-full rounded-sm overflow-hidden bg-white border border-slate-100">
+        <div className="flex flex-col items-center pt-1.5 pb-1">
+          <div className="h-1.5 w-16 rounded-full bg-slate-800" />
+          <div className="h-1 w-10 rounded-full bg-slate-400 mt-0.5" />
+        </div>
+        <div className="mx-2 border-t-2 border-slate-700 pt-1 flex gap-1">
+          <div className="flex-1 space-y-0.5">
+            <div className="h-1 w-full rounded-full bg-slate-200" />
+            <div className="h-1 w-3/4 rounded-full bg-slate-100" />
+          </div>
+          <div className="w-12 space-y-0.5">
+            <div className="h-1 w-full rounded-full bg-slate-200" />
+            <div className="h-1 w-3/4 rounded-full bg-slate-100" />
+          </div>
+        </div>
+        <div className="mx-2 mt-1 flex justify-end">
+          <div className="h-1.5 w-14 rounded-full bg-slate-700" />
         </div>
       </div>
     ),
@@ -485,7 +511,7 @@ export default function SettingsPage() {
             {/* Invoice template */}
             <div>
               <p className="mb-3 text-sm font-medium text-foreground">Invoice Template</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {TEMPLATES.map((tmpl) => (
                   <button
                     key={tmpl.id}
