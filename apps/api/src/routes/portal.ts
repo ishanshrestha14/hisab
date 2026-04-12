@@ -72,8 +72,7 @@ portal.get("/:token", viewLimiter, async (c) => {
     brandColor: invoice.user.brandColor,
     logoUrl: invoice.user.logoUrl,
     client: invoice.client,
-    freelancer: {    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices
-      name: invoice.user.name,
+    freelancer: {   
       email: invoice.user.email,
       pan: invoice.user.pan,
       vatNumber: invoice.user.vatNumber,
