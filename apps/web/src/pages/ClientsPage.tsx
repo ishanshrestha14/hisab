@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Users, AlertCircle } from "lucide-react";
+import { Link } from "react-router";
+import { Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight, Users, AlertCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -302,6 +303,17 @@ export default function ClientsPage() {
                   </td>
                   <td className="px-6 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <Link
+                        to={`/clients/${client.id}/statement`}
+                        className={cn(
+                          "rounded-md p-2 text-muted-foreground",
+                          "transition-colors hover:bg-accent hover:text-foreground"
+                        )}
+                        aria-label={`View statement for ${client.name}`}
+                        title="View statement"
+                      >
+                        <FileText size={15} />
+                      </Link>
                       <button
                         onClick={() => setDialogClient(client)}
                         className={cn(

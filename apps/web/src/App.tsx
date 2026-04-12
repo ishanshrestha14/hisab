@@ -13,6 +13,7 @@ import QuoteDetailPage from "./pages/QuoteDetailPage";
 import RecurringPage from "./pages/RecurringPage";
 import RecurringNewPage from "./pages/RecurringNewPage";
 import ReportsPage from "./pages/ReportsPage";
+import ClientStatementPage from "./pages/ClientStatementPage";
 import PortalPage from "./pages/PortalPage";
 import SettingsPage from "./pages/SettingsPage";
 import AppLayout from "./components/AppLayout";
@@ -56,6 +57,7 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="clients" element={<ClientsPage />} />
+        <Route path="clients/:id/statement" element={<ClientStatementPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="invoices/new" element={<InvoiceNewPage />} />
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />

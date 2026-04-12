@@ -58,6 +58,47 @@ clients.put("/:id", zValidator("json", updateClientSchema), async (c) => {
   return c.json(updated);
 });
 
+// GET /api/clients/:id/statement — all invoices for one client with totals
+clients.get("/:id/statement", async (c) => {
+  const user = c.get("user");
+  const { id } = c.req.param();
+
+  const client = await prisma.client.findFirst({
+    where: { id, userId: user.id },
+  });
+  if (!client) return apiError(c, "NOT_FOUND", "Client not found");
+
+  const invoices = await prisma.invoice.findMany({
+    where: { clientId: id, userId: user.id },
+    include: { lineItems: true },
+    orderBy: { issueDate: "asc" },
+  });
+
+  const invoicesWithTotals = invoices.map((inv) => {
+    const total = inv.lineItems.reduce((s, li) => s + li.total, 0);
+    const tdsAmount = total * (inv.tdsPercent / 100);
+    const netReceivable = total - tdsAmount;
+    return { ...inv, total, tdsAmount, netReceivable };
+  });
+
+  const summary = invoicesWithTotals.reduce(
+    (acc, inv) => {
+      acc.invoiceCount++;
+      acc.totalInvoiced += inv.total;
+      if (inv.status === "PAID") {
+        acc.totalPaid += inv.total;
+        acc.paidCount++;
+      } else if (inv.status === "SENT" || inv.status === "OVERDUE") {
+        acc.totalOutstanding += inv.total;
+      }
+      return acc;
+    },
+    { totalInvoiced: 0, totalPaid: 0, totalOutstanding: 0, invoiceCount: 0, paidCount: 0 }
+  );
+
+  return c.json({ client, invoices: invoicesWithTotals, summary });
+});
+
 // DELETE /api/clients/:id
 clients.delete("/:id", async (c) => {
   const user = c.get("user");
