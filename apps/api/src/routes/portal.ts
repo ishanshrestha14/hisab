@@ -44,6 +44,8 @@ portal.get("/:token", viewLimiter, async (c) => {
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  const tdsAmount = total * (invoice.tdsPercent / 100);
+  const netReceivable = total - tdsAmount;
 
   // Get NPR rate for display (best-effort — don't fail if API is down)
   let nprRate: number | null = null;
@@ -61,13 +63,16 @@ portal.get("/:token", viewLimiter, async (c) => {
     dueDate: invoice.dueDate,
     notes: invoice.notes,
     total,
+    tdsPercent: invoice.tdsPercent,
+    tdsAmount,
+    netReceivable,
     nprRate,
     nprTotal: nprRate ? total * nprRate : null,
     template: invoice.user.invoiceTemplate,
     brandColor: invoice.user.brandColor,
     logoUrl: invoice.user.logoUrl,
     client: invoice.client,
-    freelancer: {
+    freelancer: {    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices    feat: add TDS tracking to invoices
       name: invoice.user.name,
       email: invoice.user.email,
       pan: invoice.user.pan,

@@ -160,16 +160,20 @@ export default function InvoiceNewPage() {
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0] as unknown as Date,
+      tdsPercent: 0,
       lineItems: [{ description: "", quantity: 1, unitPrice: 0 }],
     },
   });
 
   const selectedCurrency = watch("currency");
+  const tdsPercent = Number(watch("tdsPercent")) || 0;
   const lineItems = watch("lineItems") ?? [];
-  const total = lineItems.reduce(
+  const subtotal = lineItems.reduce(
     (sum, item) => sum + (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0),
     0
   );
+  const tdsAmount = subtotal * (tdsPercent / 100);
+  const netReceivable = subtotal - tdsAmount;
 
   const mutation = useMutation({
     mutationFn: (data: CreateInvoiceInput) => api.post("/api/invoices", data),
@@ -265,23 +269,64 @@ export default function InvoiceNewPage() {
             <LineItemsTable control={control} register={register} errors={errors} />
           </div>
 
-          {/* Notes + total */}
+          {/* Notes + TDS + total */}
           <div className="rounded-lg border border-border bg-card p-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div>
-                <label className={labelClass}>Notes</label>
-                <textarea
-                  {...register("notes")}
-                  rows={3}
-                  placeholder="Payment terms, bank details, etc."
-                  className={inputClass + " resize-none"}
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass}>Notes</label>
+                  <textarea
+                    {...register("notes")}
+                    rows={3}
+                    placeholder="Payment terms, bank details, etc."
+                    className={inputClass + " resize-none"}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>
+                    TDS Rate (%)
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      Nepal standard: 15%
+                    </span>
+                  </label>
+                  <input
+                    {...register("tdsPercent", { valueAsNumber: true })}
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Leave at 0 if client does not withhold TDS
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-col items-end justify-end">
-                <p className="text-sm text-muted-foreground">Total</p>
-                <p className="mt-1 text-3xl font-bold text-foreground">
-                  {formatCurrency(total, selectedCurrency)}
-                </p>
+              <div className="flex flex-col items-end justify-end gap-2">
+                {tdsPercent > 0 ? (
+                  <div className="w-full max-w-[220px] space-y-1.5 text-sm">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Gross</span>
+                      <span>{formatCurrency(subtotal, selectedCurrency)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-500">
+                      <span>TDS ({tdsPercent}%)</span>
+                      <span>−{formatCurrency(tdsAmount, selectedCurrency)}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-border pt-1.5 font-semibold text-foreground">
+                      <span>Net Receivable</span>
+                      <span>{formatCurrency(netReceivable, selectedCurrency)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="mt-1 text-3xl font-bold text-foreground">
+                      {formatCurrency(subtotal, selectedCurrency)}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>

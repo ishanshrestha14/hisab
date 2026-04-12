@@ -31,6 +31,9 @@ export interface InvoicePDFProps {
   dueDate: string;
   notes?: string | null;
   total: number;
+  tdsPercent?: number | null;
+  tdsAmount?: number | null;
+  netReceivable?: number | null;
   nprRate?: number | null;
   nprTotal?: number | null;
   template?: string | null;
@@ -92,7 +95,7 @@ const classic = StyleSheet.create({
   footer: { position: "absolute", bottom: 32, left: 48, right: 48, textAlign: "center", fontSize: 9, color: "#d1d5db" },
 });
 
-function ClassicTemplate({ number, currency, issueDate, dueDate, notes, total, nprRate, nprTotal, client, freelancer, lineItems, brandColor, logoUrl }: InvoicePDFProps) {
+function ClassicTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPercent, tdsAmount, netReceivable, nprRate, nprTotal, client, freelancer, lineItems, brandColor, logoUrl }: InvoicePDFProps) {
   const accent = brandColor ?? "#f59e0b";
   return (
     <>
@@ -154,10 +157,27 @@ function ClassicTemplate({ number, currency, issueDate, dueDate, notes, total, n
       ))}
 
       <View style={classic.totalsSection}>
-        <View style={classic.grandTotal}>
-          <Text style={classic.grandTotalLabel}>Total</Text>
-          <Text style={[classic.grandTotalValue, { color: accent }]}>{formatCurrency(total, currency)}</Text>
-        </View>
+        {tdsPercent && tdsPercent > 0 && tdsAmount != null && netReceivable != null ? (
+          <>
+            <View style={classic.grandTotal}>
+              <Text style={classic.grandTotalLabel}>Gross</Text>
+              <Text style={classic.grandTotalValue}>{formatCurrency(total, currency)}</Text>
+            </View>
+            <View style={classic.grandTotal}>
+              <Text style={classic.grandTotalLabel}>TDS ({tdsPercent}%)</Text>
+              <Text style={[classic.grandTotalValue, { color: "#ef4444" }]}>−{formatCurrency(tdsAmount, currency)}</Text>
+            </View>
+            <View style={classic.grandTotal}>
+              <Text style={classic.grandTotalLabel}>Net</Text>
+              <Text style={[classic.grandTotalValue, { color: accent }]}>{formatCurrency(netReceivable, currency)}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={classic.grandTotal}>
+            <Text style={classic.grandTotalLabel}>Total</Text>
+            <Text style={[classic.grandTotalValue, { color: accent }]}>{formatCurrency(total, currency)}</Text>
+          </View>
+        )}
         {nprTotal && nprRate && (
           <Text style={classic.nprNote}>
             ≈ {formatCurrency(nprTotal, "NPR")} at 1 {currency} = ₨{nprRate.toFixed(2)}
@@ -213,7 +233,7 @@ const modern = StyleSheet.create({
   footer: { position: "absolute", bottom: 24, left: 48, right: 48, textAlign: "center", fontSize: 9, color: "#d1d5db" },
 });
 
-function ModernTemplate({ number, currency, issueDate, dueDate, notes, total, nprRate, nprTotal, client, freelancer, lineItems, brandColor, logoUrl }: InvoicePDFProps) {
+function ModernTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPercent, tdsAmount, netReceivable, nprRate, nprTotal, client, freelancer, lineItems, brandColor, logoUrl }: InvoicePDFProps) {
   const accent = brandColor ?? "#f59e0b";
   return (
     <>
@@ -277,10 +297,27 @@ function ModernTemplate({ number, currency, issueDate, dueDate, notes, total, np
 
         {/* Totals box */}
         <View style={modern.totalsBox}>
-          <View style={[modern.grandTotalRow, { backgroundColor: accent }]}>
-            <Text style={modern.totalLabel}>Total Due</Text>
-            <Text style={modern.totalValue}>{formatCurrency(total, currency)}</Text>
-          </View>
+          {tdsPercent && tdsPercent > 0 && tdsAmount != null && netReceivable != null ? (
+            <>
+              <View style={modern.totalRow}>
+                <Text style={[modern.totalLabel, { color: "#374151" }]}>Gross</Text>
+                <Text style={[modern.totalValue, { color: "#374151" }]}>{formatCurrency(total, currency)}</Text>
+              </View>
+              <View style={modern.totalRow}>
+                <Text style={[modern.totalLabel, { color: "#374151" }]}>TDS ({tdsPercent}%)</Text>
+                <Text style={[modern.totalValue, { color: "#ef4444" }]}>−{formatCurrency(tdsAmount, currency)}</Text>
+              </View>
+              <View style={[modern.grandTotalRow, { backgroundColor: accent }]}>
+                <Text style={modern.totalLabel}>Net Receivable</Text>
+                <Text style={modern.totalValue}>{formatCurrency(netReceivable, currency)}</Text>
+              </View>
+            </>
+          ) : (
+            <View style={[modern.grandTotalRow, { backgroundColor: accent }]}>
+              <Text style={modern.totalLabel}>Total Due</Text>
+              <Text style={modern.totalValue}>{formatCurrency(total, currency)}</Text>
+            </View>
+          )}
         </View>
         {nprTotal && nprRate && (
           <Text style={modern.nprNote}>
@@ -335,7 +372,7 @@ const minimal = StyleSheet.create({
   footer: { position: "absolute", bottom: 32, left: 56, right: 56, textAlign: "center", fontSize: 8, color: "#d1d5db" },
 });
 
-function MinimalTemplate({ number, currency, issueDate, dueDate, notes, total, nprRate, nprTotal, client, freelancer, lineItems, logoUrl }: InvoicePDFProps) {
+function MinimalTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPercent, tdsAmount, netReceivable, nprRate, nprTotal, client, freelancer, lineItems, logoUrl }: InvoicePDFProps) {
   return (
     <>
       <View style={minimal.header}>
@@ -396,10 +433,27 @@ function MinimalTemplate({ number, currency, issueDate, dueDate, notes, total, n
       ))}
 
       <View style={minimal.totalRule} />
-      <View style={minimal.totalRow}>
-        <Text style={minimal.totalLabel}>Total Due</Text>
-        <Text style={minimal.totalValue}>{formatCurrency(total, currency)}</Text>
-      </View>
+      {tdsPercent && tdsPercent > 0 && tdsAmount != null && netReceivable != null ? (
+        <>
+          <View style={[minimal.totalRow, { paddingTop: 10 }]}>
+            <Text style={[minimal.totalLabel, { fontSize: 10, fontWeight: 400 }]}>Gross</Text>
+            <Text style={[minimal.totalValue, { fontSize: 10, fontWeight: 400 }]}>{formatCurrency(total, currency)}</Text>
+          </View>
+          <View style={[minimal.totalRow, { paddingTop: 6 }]}>
+            <Text style={[minimal.totalLabel, { fontSize: 10, fontWeight: 400 }]}>TDS ({tdsPercent}%)</Text>
+            <Text style={[minimal.totalValue, { fontSize: 10, fontWeight: 400, color: "#ef4444" }]}>−{formatCurrency(tdsAmount, currency)}</Text>
+          </View>
+          <View style={[minimal.totalRow, { paddingTop: 8, borderTopWidth: 1, borderTopColor: "#e5e7eb", marginTop: 4 }]}>
+            <Text style={minimal.totalLabel}>Net Receivable</Text>
+            <Text style={minimal.totalValue}>{formatCurrency(netReceivable, currency)}</Text>
+          </View>
+        </>
+      ) : (
+        <View style={minimal.totalRow}>
+          <Text style={minimal.totalLabel}>Total Due</Text>
+          <Text style={minimal.totalValue}>{formatCurrency(total, currency)}</Text>
+        </View>
+      )}
       {nprTotal && nprRate && (
         <Text style={minimal.nprNote}>
           ≈ {formatCurrency(nprTotal, "NPR")} at 1 {currency} = ₨{nprRate.toFixed(2)}

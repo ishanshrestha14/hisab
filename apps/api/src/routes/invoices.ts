@@ -66,6 +66,8 @@ invoices.get("/:id", async (c) => {
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
 
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  const tdsAmount = total * (invoice.tdsPercent / 100);
+  const netReceivable = total - tdsAmount;
   let nprRate: number | null = null;
   if (invoice.currency !== "NPR") {
     nprRate = await getNPRRate(
@@ -76,6 +78,8 @@ invoices.get("/:id", async (c) => {
   return c.json({
     ...invoice,
     total,
+    tdsAmount,
+    netReceivable,
     nprRate,
     nprTotal: nprRate ? total * nprRate : null,
     template: invoice.user.invoiceTemplate,

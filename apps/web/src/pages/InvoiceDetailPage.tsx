@@ -12,6 +12,9 @@ interface InvoiceDetail extends InvoicePDFProps {
   id: string;
   token: string;
   status: string;
+  tdsPercent: number;
+  tdsAmount: number;
+  netReceivable: number;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -270,12 +273,31 @@ export default function InvoiceDetailPage() {
           </table>
 
           <div className="mt-6 flex flex-col items-end gap-1.5">
-            <div className="flex items-baseline gap-8">
-              <span className="text-sm font-medium text-muted-foreground">Total</span>
-              <span className="text-3xl font-bold text-foreground">
-                {formatCurrency(invoice.total, invoice.currency)}
-              </span>
-            </div>
+            {invoice.tdsPercent > 0 ? (
+              <div className="w-full max-w-[260px] space-y-1.5 text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Gross</span>
+                  <span>{formatCurrency(invoice.total, invoice.currency)}</span>
+                </div>
+                <div className="flex justify-between text-red-500">
+                  <span>TDS ({invoice.tdsPercent}%)</span>
+                  <span>−{formatCurrency(invoice.tdsAmount, invoice.currency)}</span>
+                </div>
+                <div className="flex justify-between border-t border-border pt-1.5">
+                  <span className="font-semibold text-foreground">Net Receivable</span>
+                  <span className="text-2xl font-bold text-foreground">
+                    {formatCurrency(invoice.netReceivable, invoice.currency)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-8">
+                <span className="text-sm font-medium text-muted-foreground">Total</span>
+                <span className="text-3xl font-bold text-foreground">
+                  {formatCurrency(invoice.total, invoice.currency)}
+                </span>
+              </div>
+            )}
             {invoice.nprTotal && invoice.nprRate && (
               <p className="text-xs text-muted-foreground">
                 ≈{" "}

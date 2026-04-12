@@ -10,6 +10,9 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 interface PortalInvoice extends InvoicePDFProps {
   status: string;
+  tdsPercent: number;
+  tdsAmount: number;
+  netReceivable: number;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -224,12 +227,34 @@ export default function PortalPage() {
 
             {/* Total */}
             <div className="mt-6 flex flex-col items-end gap-1.5 border-t border-slate-100 pt-5">
-              <div className="flex items-baseline gap-8">
-                <span className="text-sm font-medium text-slate-500">Total Due</span>
-                <span className="text-3xl font-bold text-slate-900">
-                  {formatCurrency(invoice.total, invoice.currency)}
-                </span>
-              </div>
+              {invoice.tdsPercent > 0 ? (
+                <div className="w-full max-w-[280px] space-y-1.5 text-sm">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Gross Amount</span>
+                    <span>{formatCurrency(invoice.total, invoice.currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-500">
+                    <span>TDS Withheld ({invoice.tdsPercent}%)</span>
+                    <span>−{formatCurrency(invoice.tdsAmount, invoice.currency)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-2">
+                    <span className="font-semibold text-slate-700">Net Receivable</span>
+                    <span className="text-2xl font-bold text-slate-900">
+                      {formatCurrency(invoice.netReceivable, invoice.currency)}
+                    </span>
+                  </div>
+                  <p className="pt-1 text-xs text-slate-400">
+                    Client deposits TDS directly with IRD on your behalf.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-baseline gap-8">
+                  <span className="text-sm font-medium text-slate-500">Total Due</span>
+                  <span className="text-3xl font-bold text-slate-900">
+                    {formatCurrency(invoice.total, invoice.currency)}
+                  </span>
+                </div>
+              )}
               {invoice.nprTotal && invoice.nprRate && (
                 <p className="text-xs text-slate-400">
                   ≈{" "}

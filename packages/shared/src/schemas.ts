@@ -29,6 +29,7 @@ export const createInvoiceSchema = z.object({
   issueDate: z.coerce.date(),
   dueDate: z.coerce.date(),
   notes: z.string().optional(),
+  tdsPercent: z.number().min(0).max(100).default(0),
   lineItems: z.array(lineItemSchema).min(1, "At least one line item required"),
 });
 

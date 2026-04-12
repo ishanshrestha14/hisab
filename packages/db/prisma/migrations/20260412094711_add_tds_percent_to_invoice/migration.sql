@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Invoice" ADD COLUMN     "tdsPercent" DOUBLE PRECISION NOT NULL DEFAULT 0;

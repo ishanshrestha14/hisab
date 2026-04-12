@@ -144,6 +144,8 @@ model Invoice {
   notes       String?
   // Cached NPR rate at the time of sending — stored so PDF always shows original rate
   nprRate     Float?
+  // TDS percentage withheld by the client (e.g. 15 for 15%). 0 = no TDS applicable.
+  tdsPercent  Float         @default(0)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
