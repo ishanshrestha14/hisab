@@ -72,6 +72,7 @@ model User {
   invoices           Invoice[]
   quotes             Quote[]
   recurringInvoices  RecurringInvoice[]
+  timeEntries        TimeEntry[]
   expenses           Expense[]
   auditLogs          AuditLog[]
   idempotencyKeys    IdempotencyKey[]
@@ -138,6 +139,7 @@ model Client {
   invoices          Invoice[]
   quotes            Quote[]
   recurringInvoices RecurringInvoice[]
+  timeEntries       TimeEntry[]
   expenses          Expense[]
 
   @@index([userId])
@@ -162,11 +164,12 @@ model Invoice {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client    Client     @relation(fields: [clientId], references: [id])
-  lineItems LineItem[]
-  payments  Payment[]
-  quote     Quote?
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client      Client      @relation(fields: [clientId], references: [id])
+  lineItems   LineItem[]
+  payments    Payment[]
+  timeEntries TimeEntry[]
+  quote       Quote?
 
   @@unique([userId, number])
   @@index([userId, status])
@@ -275,6 +278,29 @@ model Payment {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+}
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  clientId    String
+  description String
+  hours       Float
+  hourlyRate  Float
+  currency    Currency @default(USD)
+  date        DateTime @default(now())
+  // Set when this entry has been billed — locks the entry from edits/deletes
+  invoiceId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client  Client  @relation(fields: [clientId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([userId])
+  @@index([userId, invoiceId])
+  @@index([clientId])
 }
 
 model Expense {

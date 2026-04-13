@@ -85,6 +85,25 @@ export const updateQuoteStatusSchema = z.object({
   status: QuoteStatusEnum,
 });
 
+// ─── Time Entry ───────────────────────────────────────────────────────────────
+
+export const createTimeEntrySchema = z.object({
+  clientId: z.string().cuid("Invalid client"),
+  description: z.string().min(1, "Description is required"),
+  hours: z.number().positive("Hours must be positive"),
+  hourlyRate: z.number().nonnegative("Rate must be non-negative"),
+  currency: CurrencyEnum.default("USD"),
+  date: z.coerce.date(),
+});
+
+export const updateTimeEntrySchema = createTimeEntrySchema.partial();
+
+export const generateInvoiceFromTimeSchema = z.object({
+  entryIds: z.array(z.string().cuid()).min(1, "Select at least one entry"),
+  dueDate: z.coerce.date(),
+  notes: z.string().optional(),
+});
+
 // ─── Expense ──────────────────────────────────────────────────────────────────
 
 export const ExpenseCategoryEnum = z.enum([
@@ -182,6 +201,9 @@ export type QuoteStatus = z.infer<typeof QuoteStatusEnum>;
 export type Currency = z.infer<typeof CurrencyEnum>;
 export type InvoiceStatus = z.infer<typeof InvoiceStatusEnum>;
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
+export type CreateTimeEntryInput = z.infer<typeof createTimeEntrySchema>;
+export type UpdateTimeEntryInput = z.infer<typeof updateTimeEntrySchema>;
+export type GenerateInvoiceFromTimeInput = z.infer<typeof generateInvoiceFromTimeSchema>;
 export type ExpenseCategory = z.infer<typeof ExpenseCategoryEnum>;
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>;

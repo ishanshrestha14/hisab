@@ -16,6 +16,7 @@ import dashboard from "./routes/dashboard";
 import invoices from "./routes/invoices";
 import exchangeRates from "./routes/exchange-rates";
 import expenses from "./routes/expenses";
+import timeEntries from "./routes/time-entries";
 import portal from "./routes/portal";
 import profile from "./routes/profile";
 import quotes from "./routes/quotes";
@@ -85,6 +86,9 @@ app.route("/api/reports", reports);
 
 app.use("/api/expenses/*", requireAuth);
 app.route("/api/expenses", expenses);
+
+app.use("/api/time-entries/*", requireAuth);
+app.route("/api/time-entries", timeEntries);
 
 // Public portal — no auth
 app.route("/api/portal", portal);
