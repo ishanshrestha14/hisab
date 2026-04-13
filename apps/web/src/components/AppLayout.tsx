@@ -5,6 +5,7 @@ import {
   FileText,
   ClipboardList,
   RefreshCw,
+  Receipt,
   BarChart2,
   LogOut,
   Sun,
@@ -24,6 +25,7 @@ const navItems = [
   { to: "/invoices", icon: FileText, label: "Invoices" },
   { to: "/quotes", icon: ClipboardList, label: "Quotes" },
   { to: "/recurring", icon: RefreshCw, label: "Recurring" },
+  { to: "/expenses", icon: Receipt, label: "Expenses" },
   { to: "/reports", icon: BarChart2, label: "Reports" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];

@@ -12,6 +12,7 @@ import QuoteNewPage from "./pages/QuoteNewPage";
 import QuoteDetailPage from "./pages/QuoteDetailPage";
 import RecurringPage from "./pages/RecurringPage";
 import RecurringNewPage from "./pages/RecurringNewPage";
+import ExpensesPage from "./pages/ExpensesPage";
 import ReportsPage from "./pages/ReportsPage";
 import ClientStatementPage from "./pages/ClientStatementPage";
 import PortalPage from "./pages/PortalPage";
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="quotes/:id" element={<QuoteDetailPage />} />
         <Route path="recurring" element={<RecurringPage />} />
         <Route path="recurring/new" element={<RecurringNewPage />} />
+        <Route path="expenses" element={<ExpensesPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

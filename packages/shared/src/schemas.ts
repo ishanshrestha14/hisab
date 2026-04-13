@@ -85,6 +85,31 @@ export const updateQuoteStatusSchema = z.object({
   status: QuoteStatusEnum,
 });
 
+// ─── Expense ──────────────────────────────────────────────────────────────────
+
+export const ExpenseCategoryEnum = z.enum([
+  "SOFTWARE",
+  "HARDWARE",
+  "TRAVEL",
+  "MEALS",
+  "OFFICE",
+  "MARKETING",
+  "PROFESSIONAL_SERVICES",
+  "OTHER",
+]);
+
+export const createExpenseSchema = z.object({
+  category: ExpenseCategoryEnum.default("OTHER"),
+  description: z.string().min(1, "Description is required"),
+  amount: z.number().positive("Amount must be positive"),
+  currency: CurrencyEnum.default("USD"),
+  date: z.coerce.date(),
+  clientId: z.string().cuid().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+export const updateExpenseSchema = createExpenseSchema.partial();
+
 // ─── Payment ──────────────────────────────────────────────────────────────────
 
 export const createPaymentSchema = z.object({
@@ -157,3 +182,6 @@ export type QuoteStatus = z.infer<typeof QuoteStatusEnum>;
 export type Currency = z.infer<typeof CurrencyEnum>;
 export type InvoiceStatus = z.infer<typeof InvoiceStatusEnum>;
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
+export type ExpenseCategory = z.infer<typeof ExpenseCategoryEnum>;
+export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
+export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>;

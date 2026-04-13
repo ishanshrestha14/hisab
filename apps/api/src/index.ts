@@ -15,6 +15,7 @@ import clients from "./routes/clients";
 import dashboard from "./routes/dashboard";
 import invoices from "./routes/invoices";
 import exchangeRates from "./routes/exchange-rates";
+import expenses from "./routes/expenses";
 import portal from "./routes/portal";
 import profile from "./routes/profile";
 import quotes from "./routes/quotes";
@@ -81,6 +82,9 @@ app.route("/api/recurring", recurring);
 
 app.use("/api/reports/*", requireAuth);
 app.route("/api/reports", reports);
+
+app.use("/api/expenses/*", requireAuth);
+app.route("/api/expenses", expenses);
 
 // Public portal — no auth
 app.route("/api/portal", portal);

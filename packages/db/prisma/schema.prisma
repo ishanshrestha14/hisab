@@ -30,6 +30,17 @@ enum RecurrenceInterval {
   YEARLY
 }
 
+enum ExpenseCategory {
+  SOFTWARE
+  HARDWARE
+  TRAVEL
+  MEALS
+  OFFICE
+  MARKETING
+  PROFESSIONAL_SERVICES
+  OTHER
+}
+
 enum QuoteStatus {
   DRAFT
   SENT
@@ -61,6 +72,7 @@ model User {
   invoices           Invoice[]
   quotes             Quote[]
   recurringInvoices  RecurringInvoice[]
+  expenses           Expense[]
   auditLogs          AuditLog[]
   idempotencyKeys    IdempotencyKey[]
 }
@@ -126,6 +138,7 @@ model Client {
   invoices          Invoice[]
   quotes            Quote[]
   recurringInvoices RecurringInvoice[]
+  expenses          Expense[]
 
   @@index([userId])
 }
@@ -262,6 +275,27 @@ model Payment {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  userId      String
+  clientId    String?
+  category    ExpenseCategory @default(OTHER)
+  description String
+  amount      Float
+  currency    Currency        @default(USD)
+  date        DateTime        @default(now())
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId], references: [id])
+
+  @@index([userId])
+  @@index([userId, date])
+  @@index([clientId])
 }
 
 model AuditLog {
