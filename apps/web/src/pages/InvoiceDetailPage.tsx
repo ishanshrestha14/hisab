@@ -1,12 +1,22 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import { Copy, Check, Download, ArrowLeft, Send, AlertCircle } from "lucide-react";
+import { Copy, Check, Download, ArrowLeft, Send, AlertCircle, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { InvoicePDF, type InvoicePDFProps } from "@/components/InvoicePDF";
+import { createPaymentSchema, type CreatePaymentInput } from "@hisab/shared";
+
+interface Payment {
+  id: string;
+  amount: number;
+  paidAt: string;
+  notes: string | null;
+}
 
 interface InvoiceDetail extends InvoicePDFProps {
   id: string;
@@ -15,6 +25,9 @@ interface InvoiceDetail extends InvoicePDFProps {
   tdsPercent: number;
   tdsAmount: number;
   netReceivable: number;
+  amountPaid: number;
+  amountDue: number;
+  payments: Payment[];
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -31,30 +44,147 @@ const STATUS_LABEL: Record<string, string> = {
   OVERDUE: "Overdue",
 };
 
+const inputClass =
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/30 transition-colors duration-150";
+
+function AddPaymentDialog({
+  invoice,
+  onClose,
+}: {
+  invoice: InvoiceDetail;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const remaining = invoice.amountDue;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<CreatePaymentInput>({
+    resolver: zodResolver(createPaymentSchema),
+    defaultValues: {
+      amount: remaining > 0 ? Math.round(remaining * 100) / 100 : undefined,
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: CreatePaymentInput) =>
+      api.post(`/api/invoices/${invoice.id}/payments`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoice", invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Payment recorded");
+      onClose();
+    },
+    onError: (err: Error) => {
+      toast.error(err.message ?? "Failed to record payment");
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
+      <div className="w-full max-w-sm rounded-lg border border-border bg-card shadow-xl animate-in-up">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h2 className="font-semibold text-foreground">Record Payment</h2>
+          <button
+            onClick={onClose}
+            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <form
+          onSubmit={handleSubmit((data) => mutation.mutate(data))}
+          className="space-y-4 p-6"
+        >
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Amount ({invoice.currency}) *
+            </label>
+            <input
+              {...register("amount", { valueAsNumber: true })}
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder={remaining.toFixed(2)}
+              className={errors.amount ? inputClass.replace("border-input", "border-destructive") : inputClass}
+            />
+            {errors.amount && (
+              <p className="mt-1.5 text-xs text-destructive">{errors.amount.message}</p>
+            )}
+            {remaining > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Amount due: {formatCurrency(remaining, invoice.currency)}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Date
+            </label>
+            <input
+              {...register("paidAt")}
+              type="date"
+              defaultValue={new Date().toISOString().split("T")[0]}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Notes
+            </label>
+            <input
+              {...register("notes")}
+              placeholder="Bank transfer, ref #1234…"
+              className={inputClass}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="cursor-pointer rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || mutation.isPending}
+              className="cursor-pointer rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {mutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Saving…
+                </span>
+              ) : (
+                "Record payment"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   const { data: invoice, isLoading } = useQuery<InvoiceDetail>({
     queryKey: ["invoice", id],
     queryFn: () => api.get(`/api/invoices/${id}`),
   });
 
-  const updateStatus = useMutation({
-    mutationFn: (status: string) =>
-      api.patch(`/api/invoices/${id}/status`, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      toast.success("Invoice marked as paid");
-    },
-    onError: (err: Error) => {
-      toast.error(err.message ?? "Failed to update status");
-    },
-  });
 
   const sendInvoice = useMutation({
     mutationFn: () => api.post(`/api/invoices/${id}/send`, {}),
@@ -65,6 +195,20 @@ export default function InvoiceDetailPage() {
     },
     onError: (err: Error) => {
       toast.error(err.message ?? "Failed to send invoice");
+    },
+  });
+
+  const deletePayment = useMutation({
+    mutationFn: (paymentId: string) =>
+      api.delete(`/api/invoices/${id}/payments/${paymentId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Payment removed");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message ?? "Failed to remove payment");
     },
   });
 
@@ -166,18 +310,11 @@ export default function InvoiceDetailPage() {
 
           {invoice.status !== "PAID" && (
             <button
-              onClick={() => updateStatus.mutate("PAID")}
-              disabled={updateStatus.isPending}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-all hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => setShowPaymentDialog(true)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-all hover:bg-green-700 active:scale-[0.98]"
             >
-              {updateStatus.isPending ? (
-                <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Updating…
-                </>
-              ) : (
-                "Mark as Paid"
-              )}
+              <Plus size={13} />
+              Add Payment
             </button>
           )}
         </div>
@@ -319,6 +456,96 @@ export default function InvoiceDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Payments section */}
+      <div className="mt-6 rounded-lg border border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div>
+            <h2 className="font-medium text-foreground">Payment History</h2>
+            {invoice.amountDue > 0 && invoice.status !== "PAID" && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {formatCurrency(invoice.amountDue, invoice.currency)} remaining
+              </p>
+            )}
+          </div>
+          {invoice.status !== "PAID" && (
+            <button
+              onClick={() => setShowPaymentDialog(true)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <Plus size={12} />
+              Record payment
+            </button>
+          )}
+        </div>
+
+        {invoice.payments.length === 0 ? (
+          <div className="flex flex-col items-center py-10">
+            <p className="text-sm text-muted-foreground">No payments recorded yet</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <th className="px-6 py-3">Date</th>
+                <th className="px-6 py-3">Notes</th>
+                <th className="px-6 py-3 text-right">Amount</th>
+                <th className="px-6 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.payments.map((payment) => (
+                <tr
+                  key={payment.id}
+                  className="border-b border-border last:border-0 transition-colors hover:bg-accent/50"
+                >
+                  <td className="px-6 py-3 text-muted-foreground">
+                    {new Date(payment.paidAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="px-6 py-3 text-muted-foreground">
+                    {payment.notes ?? <span className="text-muted-foreground/50">—</span>}
+                  </td>
+                  <td className="px-6 py-3 text-right font-medium text-green-600 dark:text-green-400">
+                    +{formatCurrency(payment.amount, invoice.currency)}
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <button
+                      onClick={() => deletePayment.mutate(payment.id)}
+                      disabled={deletePayment.isPending}
+                      className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                      aria-label="Remove payment"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border">
+                <td colSpan={2} className="px-6 py-3 text-sm text-muted-foreground">
+                  Total paid
+                </td>
+                <td className="px-6 py-3 text-right font-semibold text-foreground">
+                  {formatCurrency(invoice.amountPaid, invoice.currency)}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
+
+      {showPaymentDialog && (
+        <AddPaymentDialog
+          invoice={invoice}
+          onClose={() => setShowPaymentDialog(false)}
+        />
+      )}
     </div>
   );
 }

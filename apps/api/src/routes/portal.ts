@@ -37,6 +37,7 @@ portal.get("/:token", viewLimiter, async (c) => {
         select: { name: true, email: true, company: true, country: true },
       },
       lineItems: true,
+      payments: { orderBy: { paidAt: "asc" } },
       user: { select: { name: true, email: true, pan: true, vatNumber: true, logoUrl: true, invoiceTemplate: true, brandColor: true } },
     },
   });
@@ -46,6 +47,8 @@ portal.get("/:token", viewLimiter, async (c) => {
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
   const tdsAmount = total * (invoice.tdsPercent / 100);
   const netReceivable = total - tdsAmount;
+  const amountPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
+  const amountDue = Math.max(0, total - amountPaid);
 
   // Get NPR rate for display (best-effort — don't fail if API is down)
   let nprRate: number | null = null;
@@ -66,18 +69,21 @@ portal.get("/:token", viewLimiter, async (c) => {
     tdsPercent: invoice.tdsPercent,
     tdsAmount,
     netReceivable,
+    amountPaid,
+    amountDue,
     nprRate,
     nprTotal: nprRate ? total * nprRate : null,
     template: invoice.user.invoiceTemplate,
     brandColor: invoice.user.brandColor,
     logoUrl: invoice.user.logoUrl,
     client: invoice.client,
-    freelancer: {   
+    freelancer: {
       email: invoice.user.email,
       pan: invoice.user.pan,
       vatNumber: invoice.user.vatNumber,
     },
     lineItems: invoice.lineItems,
+    payments: invoice.payments,
   });
 });
 
@@ -91,6 +97,7 @@ portal.post("/:token/mark-paid", markPaidLimiter, async (c) => {
       user: { select: { name: true, email: true } },
       client: { select: { name: true } },
       lineItems: true,
+      payments: true,
     },
   });
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
@@ -99,13 +106,19 @@ portal.post("/:token/mark-paid", markPaidLimiter, async (c) => {
     return apiError(c, "BAD_REQUEST", "Only sent invoices can be marked as paid");
   }
 
-  const updated = await prisma.invoice.update({
-    where: { token },
-    data: { status: "PAID" },
-  });
+  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  const alreadyPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
+  const remaining = total - alreadyPaid;
+
+  // Create a payment record for the remaining balance and mark invoice as paid
+  await prisma.$transaction([
+    prisma.payment.create({
+      data: { invoiceId: invoice.id, amount: Math.max(0, remaining), notes: "Marked as paid via portal" },
+    }),
+    prisma.invoice.update({ where: { token }, data: { status: "PAID" } }),
+  ]);
 
   // Notify the freelancer via event bus — fire-and-forget, decoupled from email impl
-  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
   eventBus.emit("invoice.paid", {
     to: invoice.user.email,
     freelancerName: invoice.user.name,
@@ -115,7 +128,7 @@ portal.post("/:token/mark-paid", markPaidLimiter, async (c) => {
     currency: invoice.currency,
   });
 
-  return c.json({ status: updated.status });
+  return c.json({ status: "PAID" });
 });
 
 export default portal;

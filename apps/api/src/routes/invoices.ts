@@ -5,6 +5,7 @@ import {
   createInvoiceSchema,
   updateInvoiceSchema,
   updateInvoiceStatusSchema,
+  createPaymentSchema,
 } from "@hisab/shared";
 import { getNPRRate } from "../lib/exchange-rate";
 import { eventBus } from "../lib/events";
@@ -60,6 +61,7 @@ invoices.get("/:id", async (c) => {
     include: {
       client: { select: { name: true, email: true, company: true, country: true } },
       lineItems: true,
+      payments: { orderBy: { paidAt: "asc" } },
       user: { select: { name: true, email: true, pan: true, vatNumber: true, logoUrl: true, invoiceTemplate: true, brandColor: true } },
     },
   });
@@ -68,6 +70,8 @@ invoices.get("/:id", async (c) => {
   const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
   const tdsAmount = total * (invoice.tdsPercent / 100);
   const netReceivable = total - tdsAmount;
+  const amountPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
+  const amountDue = Math.max(0, total - amountPaid);
   let nprRate: number | null = null;
   if (invoice.currency !== "NPR") {
     nprRate = await getNPRRate(
@@ -80,6 +84,8 @@ invoices.get("/:id", async (c) => {
     total,
     tdsAmount,
     netReceivable,
+    amountPaid,
+    amountDue,
     nprRate,
     nprTotal: nprRate ? total * nprRate : null,
     template: invoice.user.invoiceTemplate,
@@ -92,6 +98,113 @@ invoices.get("/:id", async (c) => {
       vatNumber: invoice.user.vatNumber,
     },
   });
+});
+
+// POST /api/invoices/:id/payments
+invoices.post("/:id/payments", zValidator("json", createPaymentSchema), async (c) => {
+  const user = c.get("user");
+  const { id } = c.req.param();
+  const body = c.req.valid("json");
+
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, userId: user.id },
+    include: { lineItems: true, payments: true, client: { select: { name: true, email: true } } },
+  });
+  if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
+  if (invoice.status === "DRAFT") return apiError(c, "BAD_REQUEST", "Cannot record payment on a draft invoice");
+
+  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  const alreadyPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
+  if (alreadyPaid + body.amount > total + 0.001) {
+    return apiError(c, "BAD_REQUEST", "Payment exceeds invoice total");
+  }
+
+  const payment = await prisma.payment.create({
+    data: {
+      invoiceId: id,
+      amount: body.amount,
+      paidAt: body.paidAt ?? new Date(),
+      notes: body.notes,
+    },
+  });
+
+  // Auto-transition to PAID when fully paid
+  const newTotal = alreadyPaid + body.amount;
+  let newStatus = invoice.status;
+  if (newTotal >= total - 0.001 && invoice.status !== "PAID") {
+    await prisma.invoice.update({ where: { id }, data: { status: "PAID" } });
+    newStatus = "PAID";
+
+    audit({
+      userId: user.id,
+      entityType: "invoice",
+      entityId: id,
+      action: "invoice.paid",
+      before: { status: invoice.status },
+      after: { status: "PAID" },
+    });
+
+    eventBus.emit("invoice.paid", {
+      to: invoice.client.email,
+      clientName: invoice.client.name,
+      freelancerName: user.name,
+      invoiceNumber: invoice.number,
+      total,
+      currency: invoice.currency,
+    });
+  }
+
+  audit({
+    userId: user.id,
+    entityType: "invoice",
+    entityId: id,
+    action: "payment.created",
+    after: { paymentId: payment.id, amount: payment.amount, paidAt: payment.paidAt },
+  });
+
+  return c.json({ payment, status: newStatus }, 201);
+});
+
+// DELETE /api/invoices/:id/payments/:paymentId
+invoices.delete("/:id/payments/:paymentId", async (c) => {
+  const user = c.get("user");
+  const { id, paymentId } = c.req.param();
+
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, userId: user.id },
+  });
+  if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
+
+  const payment = await prisma.payment.findFirst({
+    where: { id: paymentId, invoiceId: id },
+  });
+  if (!payment) return apiError(c, "NOT_FOUND", "Payment not found");
+
+  await prisma.payment.delete({ where: { id: paymentId } });
+
+  // Revert PAID status if invoice no longer fully paid
+  if (invoice.status === "PAID") {
+    const remaining = await prisma.payment.aggregate({
+      where: { invoiceId: id },
+      _sum: { amount: true },
+    });
+    const lineItems = await prisma.lineItem.findMany({ where: { invoiceId: id } });
+    const total = lineItems.reduce((sum, li) => sum + li.total, 0);
+    const paid = remaining._sum.amount ?? 0;
+    if (paid < total - 0.001) {
+      await prisma.invoice.update({ where: { id }, data: { status: "SENT" } });
+    }
+  }
+
+  audit({
+    userId: user.id,
+    entityType: "invoice",
+    entityId: id,
+    action: "payment.deleted",
+    before: { paymentId: payment.id, amount: payment.amount },
+  });
+
+  return c.json({ success: true });
 });
 
 // POST /api/invoices

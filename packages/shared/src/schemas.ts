@@ -85,6 +85,14 @@ export const updateQuoteStatusSchema = z.object({
   status: QuoteStatusEnum,
 });
 
+// ─── Payment ──────────────────────────────────────────────────────────────────
+
+export const createPaymentSchema = z.object({
+  amount: z.number().positive("Amount must be positive"),
+  paidAt: z.coerce.date().optional(),
+  notes: z.string().optional(),
+});
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export const InvoiceTemplateEnum = z.enum(["classic", "modern", "minimal", "ird"]);
@@ -148,3 +156,4 @@ export type UpdateQuoteInput = z.infer<typeof updateQuoteSchema>;
 export type QuoteStatus = z.infer<typeof QuoteStatusEnum>;
 export type Currency = z.infer<typeof CurrencyEnum>;
 export type InvoiceStatus = z.infer<typeof InvoiceStatusEnum>;
+export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;

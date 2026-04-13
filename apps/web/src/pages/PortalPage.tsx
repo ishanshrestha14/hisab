@@ -8,11 +8,21 @@ import { InvoicePDF, type InvoicePDFProps } from "@/components/InvoicePDF";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
+interface PortalPayment {
+  id: string;
+  amount: number;
+  paidAt: string;
+  notes: string | null;
+}
+
 interface PortalInvoice extends InvoicePDFProps {
   status: string;
   tdsPercent: number;
   tdsAmount: number;
   netReceivable: number;
+  amountPaid: number;
+  amountDue: number;
+  payments: PortalPayment[];
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -306,6 +316,51 @@ export default function PortalPage() {
             )}
           </div>
         </div>
+
+        {/* Payment history */}
+        {invoice.payments.length > 0 && (
+          <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-6 py-4">
+              <h2 className="text-sm font-semibold text-slate-700">Payment History</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-400">
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Notes</th>
+                  <th className="px-6 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.payments.map((p) => (
+                  <tr key={p.id} className="border-b border-slate-50 last:border-0">
+                    <td className="px-6 py-3 text-slate-500">
+                      {new Date(p.paidAt).toLocaleDateString("en-US", {
+                        month: "short", day: "numeric", year: "numeric",
+                      })}
+                    </td>
+                    <td className="px-6 py-3 text-slate-500">{p.notes ?? "—"}</td>
+                    <td className="px-6 py-3 text-right font-medium text-green-600">
+                      +{formatCurrency(p.amount, invoice.currency)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {invoice.amountDue > 0 && (
+                <tfoot>
+                  <tr className="border-t border-slate-100 bg-slate-50/60">
+                    <td colSpan={2} className="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">
+                      Balance Due
+                    </td>
+                    <td className="px-6 py-3 text-right font-semibold text-slate-900">
+                      {formatCurrency(invoice.amountDue, invoice.currency)}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
 
         {/* Error */}
         {markPaid.error && (
