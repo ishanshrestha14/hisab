@@ -229,8 +229,8 @@ export default function ClientsPage() {
   });
 
   return (
-    <div className="p-8 animate-in-up">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-8 animate-in-up">
+      <div className="mb-6 sm:mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Clients</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -270,7 +270,7 @@ export default function ClientsPage() {
             </button>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-6 py-3 font-medium">Client</th>
@@ -339,7 +339,7 @@ export default function ClientsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

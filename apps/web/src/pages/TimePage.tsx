@@ -451,38 +451,50 @@ export default function TimePage() {
       : null;
 
   return (
-    <div className="p-8 animate-in-up">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-8 animate-in-up">
+      <div className="mb-5 sm:mb-8 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Time Tracking</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Log hours and generate invoices from your timesheet
           </p>
         </div>
         <button
           onClick={() => setDialog({ type: "entry" })}
-          className="flex cursor-pointer items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
+          className="flex shrink-0 cursor-pointer items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
         >
           <Plus size={16} />
-          Log time
+          <span className="hidden sm:inline">Log time</span>
+          <span className="sm:hidden">Log</span>
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="mb-4 flex gap-0.5 border-b border-border">
-        {(["unbilled", "billed"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); setPage(1); setSelected(new Set()); }}
-            className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 -mb-px capitalize ${
-              tab === t
-                ? "border-brand text-brand"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+      {/* Tabs — dropdown on mobile, tabs on desktop */}
+      <div className="mb-4">
+        <select
+          className="sm:hidden rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground capitalize focus:outline-none focus:ring-2 focus:ring-brand/30"
+          value={tab}
+          onChange={(e) => { setTab(e.target.value as Tab); setPage(1); setSelected(new Set()); }}
+        >
+          {(["unbilled", "billed"] as Tab[]).map((t) => (
+            <option key={t} value={t} className="capitalize">{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+          ))}
+        </select>
+        <div className="hidden sm:flex gap-0.5 border-b border-border">
+          {(["unbilled", "billed"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setPage(1); setSelected(new Set()); }}
+              className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 -mb-px capitalize ${
+                tab === t
+                  ? "border-brand text-brand"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Generate invoice bar */}
@@ -554,7 +566,7 @@ export default function TimePage() {
             )}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {tab === "unbilled" && (
@@ -675,7 +687,7 @@ export default function TimePage() {
                 <td colSpan={tab === "unbilled" ? 2 : 1} />
               </tr>
             </tfoot>
-          </table>
+          </table></div>
         )}
       </div>
 

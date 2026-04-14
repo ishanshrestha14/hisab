@@ -102,7 +102,7 @@ export default function ReportsPage() {
   const hasData = (data?.summary.invoiceCount ?? 0) > 0;
 
   return (
-    <div className="p-8 animate-in-up">
+    <div className="p-4 sm:p-8 animate-in-up">
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -222,7 +222,7 @@ export default function ReportsPage() {
             <div className="border-b border-border px-6 py-4">
               <h2 className="font-medium text-foreground">Breakdown by Currency</h2>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <th className="px-6 py-3">Currency</th>
@@ -279,7 +279,7 @@ export default function ReportsPage() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           {/* By Client */}
@@ -287,7 +287,7 @@ export default function ReportsPage() {
             <div className="border-b border-border px-6 py-4">
               <h2 className="font-medium text-foreground">Breakdown by Client</h2>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <th className="px-6 py-3">Client</th>
@@ -323,7 +323,7 @@ export default function ReportsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           {/* Footer note */}

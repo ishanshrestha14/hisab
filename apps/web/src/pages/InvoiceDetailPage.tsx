@@ -252,9 +252,9 @@ export default function InvoiceDetailPage() {
   }
 
   return (
-    <div className="p-8 animate-in-up">
+    <div className="p-4 sm:p-8 animate-in-up">
       {/* Toolbar */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => navigate("/invoices")}
           className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -262,7 +262,7 @@ export default function InvoiceDetailPage() {
           <ArrowLeft size={16} />
           Back to invoices
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={copyPortalLink}
             className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] ${
@@ -338,7 +338,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* From / To / Dates */}
-        <div className="grid grid-cols-3 gap-6 border-b border-border px-8 py-6">
+        <div className="grid grid-cols-1 gap-6 border-b border-border px-4 py-6 sm:grid-cols-3 sm:px-8">
           <div>
             <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               From
@@ -381,7 +381,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* Line items */}
-        <div className="px-8 py-6">
+        <div className="overflow-x-auto px-4 py-6 sm:px-8">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -448,7 +448,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {invoice.notes && (
-          <div className="border-t border-border px-8 py-5">
+          <div className="border-t border-border px-4 py-5 sm:px-8">
             <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Notes
             </p>
@@ -484,7 +484,7 @@ export default function InvoiceDetailPage() {
             <p className="text-sm text-muted-foreground">No payments recorded yet</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-6 py-3">Date</th>
@@ -536,7 +536,7 @@ export default function InvoiceDetailPage() {
                 <td />
               </tr>
             </tfoot>
-          </table>
+          </table></div>
         )}
       </div>
 

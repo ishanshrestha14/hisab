@@ -81,7 +81,7 @@ export default function QuoteDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8 space-y-4">
+      <div className="p-4 sm:p-8 space-y-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-12 animate-pulse rounded bg-muted" />
         ))}
@@ -110,9 +110,9 @@ export default function QuoteDetailPage() {
   const canConvert = quote.status === "ACCEPTED" || quote.status === "SENT";
 
   return (
-    <div className="p-8 animate-in-up">
+    <div className="p-4 sm:p-8 animate-in-up">
       {/* Toolbar */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => navigate("/quotes")}
           className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -121,7 +121,7 @@ export default function QuoteDetailPage() {
           Back to quotes
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {quote.status === "DRAFT" && (
             <button
               onClick={() => updateStatus.mutate("SENT")}
@@ -224,7 +224,7 @@ export default function QuoteDetailPage() {
         </div>
 
         {/* Bill To / Dates */}
-        <div className="grid grid-cols-3 gap-6 border-b border-border px-8 py-6">
+        <div className="grid grid-cols-1 gap-6 border-b border-border px-4 py-6 sm:grid-cols-3 sm:px-8">
           <div>
             <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Bill To</p>
             <p className="font-medium text-foreground">{quote.client.name}</p>
@@ -245,7 +245,7 @@ export default function QuoteDetailPage() {
         </div>
 
         {/* Line items */}
-        <div className="px-8 py-6">
+        <div className="overflow-x-auto px-4 py-6 sm:px-8">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -278,7 +278,7 @@ export default function QuoteDetailPage() {
         </div>
 
         {quote.notes && (
-          <div className="border-t border-border px-8 py-5">
+          <div className="border-t border-border px-4 py-5 sm:px-8">
             <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</p>
             <p className="text-sm text-foreground">{quote.notes}</p>
           </div>

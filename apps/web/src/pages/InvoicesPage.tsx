@@ -65,8 +65,8 @@ export default function InvoicesPage() {
       : invoices.filter((inv) => inv.status === activeTab);
 
   return (
-    <div className="p-8 animate-in-up">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="p-4 sm:p-8 animate-in-up">
+      <div className="mb-5 sm:mb-8 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -75,47 +75,54 @@ export default function InvoicesPage() {
         </div>
         <Link
           to="/invoices/new"
-          className="flex cursor-pointer items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
+          className="flex shrink-0 cursor-pointer items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
         >
           <Plus size={16} />
-          New invoice
+          <span className="hidden sm:inline">New invoice</span>
+          <span className="sm:hidden">New</span>
         </Link>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="mb-4 flex gap-0.5 border-b border-border">
-        {TABS.map((tab) => {
-          const count =
-            tab.value === "ALL"
-              ? (pagination?.total ?? invoices.length)
-              : invoices.filter((inv) => inv.status === tab.value).length;
+      {/* Status filter — dropdown on mobile, tabs on desktop */}
+      <div className="mb-4">
+        {/* Mobile dropdown */}
+        <select
+          className="sm:hidden rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/30"
+          value={activeTab}
+          onChange={(e) => { setActiveTab(e.target.value as FilterTab); setPage(1); }}
+        >
+          {TABS.map((tab) => (
+            <option key={tab.value} value={tab.value}>{tab.label}</option>
+          ))}
+        </select>
 
-          return (
-            <button
-              key={tab.value}
-              onClick={() => {
-                setActiveTab(tab.value);
-                setPage(1);
-              }}
-              className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 -mb-px ${
-                activeTab === tab.value
-                  ? "border-brand text-brand"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-xs transition-colors ${
+        {/* Desktop tabs */}
+        <div className="hidden sm:flex gap-0.5 border-b border-border">
+          {TABS.map((tab) => {
+            const count =
+              tab.value === "ALL"
+                ? (pagination?.total ?? invoices.length)
+                : invoices.filter((inv) => inv.status === tab.value).length;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => { setActiveTab(tab.value); setPage(1); }}
+                className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 -mb-px ${
                   activeTab === tab.value
-                    ? "bg-brand/10 text-brand"
-                    : "bg-muted text-muted-foreground"
+                    ? "border-brand text-brand"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+                {tab.label}
+                <span className={`rounded-full px-1.5 py-0.5 text-xs transition-colors ${
+                  activeTab === tab.value ? "bg-brand/10 text-brand" : "bg-muted text-muted-foreground"
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card">
@@ -148,7 +155,7 @@ export default function InvoicesPage() {
             )}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-6 py-3 font-medium">Invoice</th>
@@ -194,7 +201,7 @@ export default function InvoicesPage() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
