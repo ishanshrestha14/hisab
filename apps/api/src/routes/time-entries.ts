@@ -8,24 +8,11 @@ import {
 } from "@hisab/shared";
 import { apiError } from "../lib/errors";
 import { audit } from "../lib/audit";
+import { nextInvoiceNumber } from "../services/numbering";
 
 const timeEntries = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
-
-// Reuse the same race-condition-safe invoice number generator
-async function nextInvoiceNumber(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  userId: string
-): Promise<string> {
-  const rows = await tx.$queryRaw<[{ max: number | null }]>`
-    SELECT MAX(CAST(SUBSTRING(number FROM 5) AS INTEGER)) AS max
-    FROM "Invoice"
-    WHERE "userId" = ${userId}
-  `;
-  const next = (rows[0].max ?? 0) + 1;
-  return `INV-${String(next).padStart(3, "0")}`;
-}
 
 // GET /api/time-entries?page=1&limit=20&status=unbilled|billed&clientId=
 timeEntries.get("/", async (c) => {

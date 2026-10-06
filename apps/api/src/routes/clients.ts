@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "@hisab/db";
 import { createClientSchema, updateClientSchema } from "@hisab/shared";
 import { apiError } from "../lib/errors";
+import { computeInvoiceTotals } from "../services/invoice-calc";
 
 // Each route file gets its own Hono instance — mounted at /api/clients in index.ts
 const clients = new Hono<{
@@ -75,9 +76,7 @@ clients.get("/:id/statement", async (c) => {
   });
 
   const invoicesWithTotals = invoices.map((inv) => {
-    const total = inv.lineItems.reduce((s, li) => s + li.total, 0);
-    const tdsAmount = total * (inv.tdsPercent / 100);
-    const netReceivable = total - tdsAmount;
+    const { total, tdsAmount, netReceivable } = computeInvoiceTotals(inv);
     return { ...inv, total, tdsAmount, netReceivable };
   });
 

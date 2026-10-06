@@ -52,6 +52,13 @@ pnpm dev                              # starts all apps via turbo
 - Side-effects (email): emit via `eventBus` from `lib/events.ts` — never import email functions directly in routes
 - Audit trail: call `audit(...)` from `lib/audit.ts` after any invoice mutation
 
+### Testing (Vitest)
+- `pnpm test` runs all projects (`api`, `web`, `shared`); `pnpm test:coverage` for coverage; CI runs it on every PR
+- Test files live next to the code: `foo.ts` → `foo.test.ts`
+- Pure business logic belongs in `apps/api/src/services/` and gets unit tests (no mocks needed)
+- Route tests use Hono's `app.request()` with Prisma mocked: `vi.mock("@hisab/db", () => import("../test/prisma-mock"))`
+- Also mock `../lib/audit` and `../lib/events` in route tests; assert on `audit` / `eventBus.emit` calls
+
 ### Frontend patterns
 - Data fetching via TanStack Query (`useQuery` / `useMutation`)
 - Forms via `react-hook-form` + `zodResolver` using schemas from `@hisab/shared`
@@ -170,13 +177,13 @@ Goal: become the go-to open-source invoicing tool for Nepali freelancers and sma
 - [x] **TDS tracking** — per-invoice TDS amount withheld by client (15% standard rate); show net receivable vs gross
 - [ ] **eSewa / Khalti / ConnectIPS payment links** — generate a payment link on the portal so Nepali clients can pay directly
 - [x] **Nepali fiscal year reports** — revenue summary aligned to Shrawan–Ashad (mid-July to mid-July)
-- [ ] **IRD-compatible invoice format** — layout and fields required by  
+- [x] **IRD-compatible invoice format** — layout and fields required by Nepal's Inland Revenue Department
 ### Phase 3 — Compete on UX
 
-- [ ] **Client statement page** — all invoices for a client in one view, downloadable
-- [ ] **Partial payments + payment history** — track multiple payments against one invoice
-- [ ] **Expense tracking** — log expenses, attach to projects/clients
-- [ ] **Time-based invoicing** — log hours → generate invoice from timesheet
+- [x] **Client statement page** — all invoices for a client in one view, downloadable
+- [x] **Partial payments + payment history** — track multiple payments against one invoice
+- [x] **Expense tracking** — log expenses, attach to projects/clients
+- [x] **Time-based invoicing** — log hours → generate invoice from timesheet
 - [ ] **Multi-user / team roles** — owner, accountant, viewer permissions
 
 <!-- code-review-graph MCP tools -->

@@ -9,24 +9,12 @@ import {
 import { apiError } from "../lib/errors";
 import { audit } from "../lib/audit";
 import { logger } from "../lib/logger";
+import { nextInvoiceNumber, nextQuoteNumber } from "../services/numbering";
+import { lineItemTotal, sumLineItems } from "../services/invoice-calc";
 
 const quotes = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
-
-// Generate the next quote number inside a transaction
-async function nextQuoteNumber(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  userId: string
-): Promise<string> {
-  const rows = await tx.$queryRaw<[{ max: number | null }]>`
-    SELECT MAX(CAST(SUBSTRING(number FROM 4) AS INTEGER)) AS max
-    FROM "Quote"
-    WHERE "userId" = ${userId}
-  `;
-  const next = (rows[0].max ?? 0) + 1;
-  return `QT-${String(next).padStart(3, "0")}`;
-}
 
 // GET /api/quotes?page=1&limit=20
 quotes.get("/", async (c) => {
@@ -61,7 +49,7 @@ quotes.get("/:id", async (c) => {
   });
   if (!quote) return apiError(c, "NOT_FOUND", "Quote not found");
 
-  const total = quote.lineItems.reduce((sum, li) => sum + li.total, 0);
+  const total = sumLineItems(quote.lineItems);
   return c.json({ ...quote, total });
 });
 
@@ -85,7 +73,7 @@ quotes.post("/", zValidator("json", createQuoteSchema), async (c) => {
         lineItems: {
           create: lineItems.map((item) => ({
             ...item,
-            total: item.quantity * item.unitPrice,
+            total: lineItemTotal(item),
           })),
         },
       },
@@ -125,7 +113,7 @@ quotes.put("/:id", zValidator("json", updateQuoteSchema), async (c) => {
           deleteMany: {},
           create: lineItems.map((item) => ({
             ...item,
-            total: item.quantity * item.unitPrice,
+            total: lineItemTotal(item),
           })),
         },
       }),
@@ -187,13 +175,7 @@ quotes.post("/:id/convert", async (c) => {
 
   // Generate invoice number + create invoice + mark quote as CONVERTED atomically
   const invoice = await prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRaw<[{ max: number | null }]>`
-      SELECT MAX(CAST(SUBSTRING(number FROM 5) AS INTEGER)) AS max
-      FROM "Invoice"
-      WHERE "userId" = ${user.id}
-    `;
-    const next = (rows[0].max ?? 0) + 1;
-    const number = `INV-${String(next).padStart(3, "0")}`;
+    const number = await nextInvoiceNumber(tx, user.id);
 
     const inv = await tx.invoice.create({
       data: {

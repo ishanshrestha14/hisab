@@ -12,25 +12,19 @@ import { eventBus } from "../lib/events";
 import { apiError } from "../lib/errors";
 import { audit } from "../lib/audit";
 import { idempotencyMiddleware } from "../middleware/idempotency.middleware";
+import { nextInvoiceNumber } from "../services/numbering";
+import {
+  computeInvoiceTotals,
+  isFullyPaid,
+  lineItemTotal,
+  paymentExceedsBalance,
+  sumLineItems,
+  sumPayments,
+} from "../services/invoice-calc";
 
 const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
-
-// Generate the next invoice number inside a transaction using MAX to avoid race conditions.
-// count() + 1 would duplicate numbers under concurrent requests; MAX is safe.
-async function nextInvoiceNumber(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  userId: string
-): Promise<string> {
-  const rows = await tx.$queryRaw<[{ max: number | null }]>`
-    SELECT MAX(CAST(SUBSTRING(number FROM 5) AS INTEGER)) AS max
-    FROM "Invoice"
-    WHERE "userId" = ${userId}
-  `;
-  const next = (rows[0].max ?? 0) + 1;
-  return `INV-${String(next).padStart(3, "0")}`;
-}
 
 // GET /api/invoices?page=1&limit=20
 invoices.get("/", async (c) => {
@@ -67,11 +61,7 @@ invoices.get("/:id", async (c) => {
   });
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
 
-  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
-  const tdsAmount = total * (invoice.tdsPercent / 100);
-  const netReceivable = total - tdsAmount;
-  const amountPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
-  const amountDue = Math.max(0, total - amountPaid);
+  const { total, tdsAmount, netReceivable, amountPaid, amountDue } = computeInvoiceTotals(invoice);
   let nprRate: number | null = null;
   if (invoice.currency !== "NPR") {
     nprRate = await getNPRRate(
@@ -113,9 +103,9 @@ invoices.post("/:id/payments", zValidator("json", createPaymentSchema), async (c
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
   if (invoice.status === "DRAFT") return apiError(c, "BAD_REQUEST", "Cannot record payment on a draft invoice");
 
-  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
-  const alreadyPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
-  if (alreadyPaid + body.amount > total + 0.001) {
+  const total = sumLineItems(invoice.lineItems);
+  const alreadyPaid = sumPayments(invoice.payments);
+  if (paymentExceedsBalance(total, alreadyPaid, body.amount)) {
     return apiError(c, "BAD_REQUEST", "Payment exceeds invoice total");
   }
 
@@ -129,9 +119,8 @@ invoices.post("/:id/payments", zValidator("json", createPaymentSchema), async (c
   });
 
   // Auto-transition to PAID when fully paid
-  const newTotal = alreadyPaid + body.amount;
   let newStatus = invoice.status;
-  if (newTotal >= total - 0.001 && invoice.status !== "PAID") {
+  if (isFullyPaid(total, alreadyPaid + body.amount) && invoice.status !== "PAID") {
     await prisma.invoice.update({ where: { id }, data: { status: "PAID" } });
     newStatus = "PAID";
 
@@ -189,9 +178,9 @@ invoices.delete("/:id/payments/:paymentId", async (c) => {
       _sum: { amount: true },
     });
     const lineItems = await prisma.lineItem.findMany({ where: { invoiceId: id } });
-    const total = lineItems.reduce((sum, li) => sum + li.total, 0);
+    const total = sumLineItems(lineItems);
     const paid = remaining._sum.amount ?? 0;
-    if (paid < total - 0.001) {
+    if (!isFullyPaid(total, paid)) {
       await prisma.invoice.update({ where: { id }, data: { status: "SENT" } });
     }
   }
@@ -230,7 +219,7 @@ invoices.post("/", idempotencyMiddleware, zValidator("json", createInvoiceSchema
         lineItems: {
           create: lineItems.map((item) => ({
             ...item,
-            total: item.quantity * item.unitPrice,
+            total: lineItemTotal(item),
           })),
         },
       },
@@ -269,7 +258,7 @@ invoices.put("/:id", zValidator("json", updateInvoiceSchema), async (c) => {
           deleteMany: {},
           create: lineItems.map((item) => ({
             ...item,
-            total: item.quantity * item.unitPrice,
+            total: lineItemTotal(item),
           })),
         },
       }),
@@ -343,7 +332,7 @@ invoices.post("/:id/send", async (c) => {
     data: { status: "SENT" },
   });
 
-  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
+  const total = sumLineItems(invoice.lineItems);
   const portalUrl = `${process.env.WEB_URL}/portal/${invoice.token}`;
 
   audit({

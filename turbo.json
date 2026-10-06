@@ -3,15 +3,21 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "db:generate": {
       "cache": false
@@ -21,6 +27,9 @@
     },
     "db:push": {
       "cache": false
+    },
+    "test": {
+      "outputs": []
     }
   }
 }

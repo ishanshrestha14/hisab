@@ -158,6 +158,7 @@ export const updateProfileSchema = z.object({
     .string()
     .url("Must be a valid URL")
     .max(500)
+    .or(z.literal("")) // empty string clears the logo
     .optional()
     .nullable()
     .transform((v) => v || null),

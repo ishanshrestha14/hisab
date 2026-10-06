@@ -2,36 +2,11 @@ import { Hono } from "hono";
 import { prisma } from "@hisab/db";
 import { getAllNPRRates } from "../lib/exchange-rate";
 import { apiError } from "../lib/errors";
+import { currentFYStartBS, fyBounds } from "../services/fiscal-year";
 
 const reports = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
-
-// ─── Nepal Fiscal Year helpers ────────────────────────────────────────────────
-// Nepal FY runs Shrawan 1 → Ashad end, approximately July 16 → July 15 next year.
-// BS year ≈ AD year + 57 for months after BS New Year (mid-April).
-// fyStartBS: the BS year in which Shrawan falls (e.g. 2081 for FY 2081/82).
-
-function fyBounds(fyStartBS: number): { start: Date; end: Date; label: string } {
-  const adStart = fyStartBS - 57; // Gregorian year when this FY's Shrawan falls
-  const start = new Date(Date.UTC(adStart, 6, 16));              // July 16 00:00 UTC
-  const end   = new Date(Date.UTC(adStart + 1, 6, 15, 23, 59, 59, 999)); // July 15 end UTC
-  return {
-    start,
-    end,
-    label: `${fyStartBS}/${String(fyStartBS + 1).slice(-2)}`,
-  };
-}
-
-function currentFYStartBS(): number {
-  const now   = new Date();
-  const month = now.getUTCMonth() + 1; // 1-12
-  const day   = now.getUTCDate();
-  const year  = now.getUTCFullYear();
-  // After July 16: we are in the FY that started this calendar year
-  const adStart = month > 7 || (month === 7 && day >= 16) ? year : year - 1;
-  return adStart + 57;
-}
 
 // GET /api/reports/fiscal-year?fy=2081
 // fy = fyStartBS (e.g. 2081 → FY 2081/82). Defaults to current FY.

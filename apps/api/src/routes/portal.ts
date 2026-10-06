@@ -4,6 +4,7 @@ import { prisma } from "@hisab/db";
 import { getNPRRate } from "../lib/exchange-rate";
 import { eventBus } from "../lib/events";
 import { apiError } from "../lib/errors";
+import { computeInvoiceTotals, sumLineItems, sumPayments } from "../services/invoice-calc";
 
 const keyFromIP = (c: Context) =>
   (c.req.header("x-forwarded-for") ?? "unknown").split(",")[0].trim();
@@ -44,11 +45,7 @@ portal.get("/:token", viewLimiter, async (c) => {
 
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
 
-  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
-  const tdsAmount = total * (invoice.tdsPercent / 100);
-  const netReceivable = total - tdsAmount;
-  const amountPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
-  const amountDue = Math.max(0, total - amountPaid);
+  const { total, tdsAmount, netReceivable, amountPaid, amountDue } = computeInvoiceTotals(invoice);
 
   // Get NPR rate for display (best-effort — don't fail if API is down)
   let nprRate: number | null = null;
@@ -106,8 +103,8 @@ portal.post("/:token/mark-paid", markPaidLimiter, async (c) => {
     return apiError(c, "BAD_REQUEST", "Only sent invoices can be marked as paid");
   }
 
-  const total = invoice.lineItems.reduce((sum, li) => sum + li.total, 0);
-  const alreadyPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
+  const total = sumLineItems(invoice.lineItems);
+  const alreadyPaid = sumPayments(invoice.payments);
   const remaining = total - alreadyPaid;
 
   // Create a payment record for the remaining balance and mark invoice as paid

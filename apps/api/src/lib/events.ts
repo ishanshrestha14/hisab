@@ -36,7 +36,8 @@ class EventBus {
   emit<K extends keyof EventMap>(event: K, payload: EventMap[K]): void {
     const handlers = this.listeners.get(event) ?? [];
     for (const handler of handlers) {
-      Promise.resolve(handler(payload)).catch((err) =>
+      // The Promise constructor also captures synchronous throws from the handler
+      new Promise<void>((resolve) => resolve(handler(payload))).catch((err) =>
         logger.error({ event, err }, "Event handler error")
       );
     }
