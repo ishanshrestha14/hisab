@@ -94,7 +94,7 @@ describe("GET /api/portal/:token", () => {
       tdsAmount: 150,
       netReceivable: 850,
       amountPaid: 200,
-      amountDue: 800,
+      amountDue: 650,
       nprRate: 135,
       nprTotal: 135_000,
     });

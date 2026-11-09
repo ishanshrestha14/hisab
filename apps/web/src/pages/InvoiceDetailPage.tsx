@@ -236,10 +236,15 @@ export default function InvoiceDetailPage() {
             description={isDraft ? "Payments can be recorded once the invoice is sent" : undefined}
           />
           <dl className="space-y-2 border-b border-border px-4 py-4 text-sm sm:px-5">
+            {hasTds && (
+              <p className="-mt-1 pb-1 text-xs text-faint">
+                Settled at the net amount; the client deposits {invoice.tdsPercent}% TDS with IRD
+              </p>
+            )}
             <div className="flex justify-between gap-4 text-muted-foreground">
-              <dt>{hasTds ? "Gross amount" : "Invoice total"}</dt>
+              <dt>{hasTds ? "Net receivable" : "Invoice total"}</dt>
               <dd>
-                <Money amount={invoice.total} currency={invoice.currency} />
+                <Money amount={hasTds ? invoice.netReceivable : invoice.total} currency={invoice.currency} />
               </dd>
             </div>
             <div className="flex justify-between gap-4 text-muted-foreground">
@@ -249,7 +254,7 @@ export default function InvoiceDetailPage() {
               </dd>
             </div>
             <div className="flex justify-between gap-4 border-t border-border pt-2 font-medium text-foreground">
-              <dt>{hasTds ? "Unpaid of gross" : "Unpaid"}</dt>
+              <dt>Unpaid</dt>
               <dd>
                 <Money amount={invoice.amountDue} currency={invoice.currency} />
               </dd>

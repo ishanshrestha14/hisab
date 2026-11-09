@@ -31,7 +31,7 @@ describe("sumLineItems / sumPayments", () => {
 });
 
 describe("computeInvoiceTotals", () => {
-  it("computes gross, TDS, net, paid and due", () => {
+  it("computes gross, TDS, net, paid and due — due is net of TDS", () => {
     const totals = computeInvoiceTotals({
       lineItems: [{ total: 1000 }, { total: 500 }],
       tdsPercent: 15,
@@ -43,7 +43,7 @@ describe("computeInvoiceTotals", () => {
       tdsAmount: 225,
       netReceivable: 1275,
       amountPaid: 400,
-      amountDue: 1100,
+      amountDue: 875,
     });
   });
 
@@ -67,6 +67,17 @@ describe("computeInvoiceTotals", () => {
   it("withholds the full amount at 100% TDS", () => {
     const totals = computeInvoiceTotals({ lineItems: [{ total: 80 }], tdsPercent: 100 });
     expect(totals.netReceivable).toBe(0);
+    expect(totals.amountDue).toBe(0);
+  });
+
+  it("is settled when the client pays the net and withholds TDS", () => {
+    const totals = computeInvoiceTotals({
+      lineItems: [{ total: 60500 }],
+      tdsPercent: 15,
+      payments: [{ amount: 51425 }],
+    });
+    expect(totals.amountDue).toBe(0);
+    expect(isFullyPaid(totals.netReceivable, totals.amountPaid)).toBe(true);
   });
 });
 

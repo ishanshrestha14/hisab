@@ -16,6 +16,8 @@ export function sumPayments(payments: { amount: number }[]): number {
   return payments.reduce((sum, p) => sum + p.amount, 0);
 }
 
+// An invoice with TDS is settled by the net receivable: the client withholds
+// the TDS and deposits it with IRD, so it never arrives as a payment.
 export interface InvoiceTotals {
   total: number;
   tdsAmount: number;
@@ -31,20 +33,23 @@ export function computeInvoiceTotals(invoice: {
 }): InvoiceTotals {
   const total = sumLineItems(invoice.lineItems);
   const tdsAmount = total * (invoice.tdsPercent / 100);
+  const netReceivable = total - tdsAmount;
   const amountPaid = sumPayments(invoice.payments ?? []);
   return {
     total,
     tdsAmount,
-    netReceivable: total - tdsAmount,
+    netReceivable,
     amountPaid,
-    amountDue: Math.max(0, total - amountPaid),
+    amountDue: Math.max(0, netReceivable - amountPaid),
   };
 }
 
-export function paymentExceedsBalance(total: number, alreadyPaid: number, amount: number): boolean {
-  return alreadyPaid + amount > total + MONEY_EPSILON;
+/** `payable` is the net receivable: what the client actually transfers */
+export function paymentExceedsBalance(payable: number, alreadyPaid: number, amount: number): boolean {
+  return alreadyPaid + amount > payable + MONEY_EPSILON;
 }
 
-export function isFullyPaid(total: number, paid: number): boolean {
-  return paid >= total - MONEY_EPSILON;
+/** `payable` is the net receivable: what the client actually transfers */
+export function isFullyPaid(payable: number, paid: number): boolean {
+  return paid >= payable - MONEY_EPSILON;
 }

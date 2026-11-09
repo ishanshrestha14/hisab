@@ -20,7 +20,6 @@ import {
   lineItemTotal,
   paymentExceedsBalance,
   sumLineItems,
-  sumPayments,
 } from "../services/invoice-calc";
 
 const invoices = new Hono<{
@@ -123,10 +122,10 @@ invoices.post("/:id/payments", zValidator("json", createPaymentSchema), async (c
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
   if (invoice.status === "DRAFT") return apiError(c, "BAD_REQUEST", "Cannot record payment on a draft invoice");
 
-  const total = sumLineItems(invoice.lineItems);
-  const alreadyPaid = sumPayments(invoice.payments);
-  if (paymentExceedsBalance(total, alreadyPaid, body.amount)) {
-    return apiError(c, "BAD_REQUEST", "Payment exceeds invoice total");
+  // Settle against the net receivable: withheld TDS never arrives as a payment
+  const { total, netReceivable, amountPaid: alreadyPaid } = computeInvoiceTotals(invoice);
+  if (paymentExceedsBalance(netReceivable, alreadyPaid, body.amount)) {
+    return apiError(c, "BAD_REQUEST", "Payment exceeds the balance due");
   }
 
   const payment = await prisma.payment.create({
@@ -140,7 +139,7 @@ invoices.post("/:id/payments", zValidator("json", createPaymentSchema), async (c
 
   // Auto-transition to PAID when fully paid
   let newStatus = invoice.status;
-  if (isFullyPaid(total, alreadyPaid + body.amount) && invoice.status !== "PAID") {
+  if (isFullyPaid(netReceivable, alreadyPaid + body.amount) && invoice.status !== "PAID") {
     await prisma.invoice.update({ where: { id }, data: { status: "PAID" } });
     newStatus = "PAID";
 
@@ -198,9 +197,9 @@ invoices.delete("/:id/payments/:paymentId", async (c) => {
       _sum: { amount: true },
     });
     const lineItems = await prisma.lineItem.findMany({ where: { invoiceId: id } });
-    const total = sumLineItems(lineItems);
+    const { netReceivable } = computeInvoiceTotals({ lineItems, tdsPercent: invoice.tdsPercent });
     const paid = remaining._sum.amount ?? 0;
-    if (!isFullyPaid(total, paid)) {
+    if (!isFullyPaid(netReceivable, paid)) {
       await prisma.invoice.update({ where: { id }, data: { status: "SENT" } });
     }
   }
