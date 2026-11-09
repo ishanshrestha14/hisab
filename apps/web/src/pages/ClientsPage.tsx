@@ -12,6 +12,7 @@ import {
   type CreateClientInput,
   type Currency,
 } from "@hisab/shared";
+import { controlClass } from "@/components/ui/field";
 
 interface Client {
   id: string;
@@ -39,16 +40,14 @@ function ClientAvatar({ name }: { name: string }) {
     .join("")
     .toUpperCase();
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/15 text-xs font-semibold text-brand">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
       {initials}
     </div>
   );
 }
 
-const inputClass =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/30 transition-colors duration-150";
-const inputErrorClass =
-  "w-full rounded-md border border-destructive bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-destructive/30 transition-colors duration-150";
+const inputClass = cn(controlClass, "py-2");
+const inputErrorClass = cn(controlClass, "py-2 border-destructive focus:border-destructive focus:ring-destructive/20");
 const labelClass = "mb-1.5 block text-sm font-medium text-foreground";
 const errorClass = "mt-1.5 flex items-center gap-1 text-xs text-destructive";
 
@@ -98,15 +97,15 @@ function ClientDialog({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-      <div className="w-full max-w-md rounded-lg border border-border bg-card shadow-xl animate-in-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in">
+      <div className="w-full max-w-md rounded-xl border border-border bg-popover shadow-[0_8px_24px_rgba(0,0,0,0.12)] animate-in-up">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-semibold text-foreground">
-            {isEdit ? "Edit Client" : "Add Client"}
+          <h2 className="text-[15px] font-medium text-foreground">
+            {isEdit ? "Edit client" : "Add client"}
           </h2>
           <button
             onClick={onClose}
-            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label="Close"
           >
             <X size={18} />
@@ -166,7 +165,7 @@ function ClientDialog({
           </div>
 
           <div>
-            <label className={labelClass}>Default Currency</label>
+            <label className={labelClass}>Default currency</label>
             <select {...register("defaultCurrency")} className={inputClass}>
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -178,18 +177,18 @@ function ClientDialog({
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || mutation.isPending}
-              className="cursor-pointer rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="cursor-pointer rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {mutation.isPending ? (
                 <span className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Saving…
                 </span>
               ) : isEdit ? "Save changes" : "Add client"}
@@ -229,24 +228,24 @@ export default function ClientsPage() {
   });
 
   return (
-    <div className="p-4 sm:p-8 animate-in-up">
+    <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-8 sm:py-8 animate-in-up">
       <div className="mb-6 sm:mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Clients</h1>
+          <h1 className="text-2xl font-medium tracking-[-0.01em] text-foreground sm:text-[28px] sm:leading-9">Clients</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage your clients
           </p>
         </div>
         <button
           onClick={() => setDialogClient("new")}
-          className="flex cursor-pointer items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
+          className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400"
         >
           <Plus size={16} />
           Add client
         </button>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
+      <div className="rounded-xl border border-border bg-card">
         {isLoading ? (
           <div className="space-y-3 p-6">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -255,16 +254,14 @@ export default function ClientsPage() {
           </div>
         ) : clients.length === 0 ? (
           <div className="flex flex-col items-center py-14">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <Users size={20} className="text-muted-foreground" />
-            </div>
+            <Users size={20} strokeWidth={1.5} className="mb-3 text-faint" />
             <p className="text-sm font-medium text-foreground">No clients yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Add your first client to start invoicing
             </p>
             <button
               onClick={() => setDialogClient("new")}
-              className="mt-4 cursor-pointer rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+              className="mt-4 cursor-pointer rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400"
             >
               Add client
             </button>
@@ -272,12 +269,12 @@ export default function ClientsPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="px-6 py-3 font-medium">Client</th>
-                <th className="px-6 py-3 font-medium">Email</th>
-                <th className="px-6 py-3 font-medium">Company</th>
-                <th className="px-6 py-3 font-medium">Currency</th>
-                <th className="px-6 py-3 font-medium" />
+              <tr className="border-b border-border text-left text-[13px] text-faint [&>th]:font-normal">
+                <th className="px-4 py-3 sm:px-6">Client</th>
+                <th className="hidden px-6 py-3 md:table-cell">Email</th>
+                <th className="hidden px-6 py-3 lg:table-cell">Company</th>
+                <th className="hidden px-6 py-3 sm:table-cell">Currency</th>
+                <th className="px-2 py-3 sm:px-6"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -286,27 +283,30 @@ export default function ClientsPage() {
                   key={client.id}
                   className="border-b border-border last:border-0 transition-colors duration-100 hover:bg-accent/50"
                 >
-                  <td className="px-6 py-3">
+                  <td className="px-4 py-3 sm:px-6">
                     <div className="flex items-center gap-3">
                       <ClientAvatar name={client.name} />
-                      <span className="font-medium text-foreground">{client.name}</span>
+                      <div className="min-w-0">
+                        <Link to={`/clients/${client.id}/statement`} className="text-foreground hover:underline">
+                          {client.name}
+                        </Link>
+                        <p className="truncate text-xs text-faint md:hidden">
+                          {client.email} · {client.defaultCurrency}
+                        </p>
+                      </div>
                     </div>
                   </td>
-                  <td className="px-6 py-3 text-muted-foreground">{client.email}</td>
-                  <td className="px-6 py-3 text-muted-foreground">
-                    {client.company ?? "—"}
+                  <td className="hidden px-6 py-3 text-muted-foreground md:table-cell">{client.email}</td>
+                  <td className="hidden px-6 py-3 text-muted-foreground lg:table-cell">
+                    {client.company ?? <span className="text-faint">—</span>}
                   </td>
-                  <td className="px-6 py-3">
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      {client.defaultCurrency}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3">
+                  <td className="hidden px-6 py-3 text-muted-foreground sm:table-cell">{client.defaultCurrency}</td>
+                  <td className="px-2 py-3 sm:px-6">
                     <div className="flex items-center justify-end gap-1">
                       <Link
                         to={`/clients/${client.id}/statement`}
                         className={cn(
-                          "rounded-md p-2 text-muted-foreground",
+                          "hidden rounded-lg p-2 text-faint sm:inline-flex",
                           "transition-colors hover:bg-accent hover:text-foreground"
                         )}
                         aria-label={`View statement for ${client.name}`}
@@ -317,7 +317,7 @@ export default function ClientsPage() {
                       <button
                         onClick={() => setDialogClient(client)}
                         className={cn(
-                          "cursor-pointer rounded-md p-2 text-muted-foreground",
+                          "cursor-pointer rounded-lg p-1.5 text-faint sm:p-2",
                           "transition-colors hover:bg-accent hover:text-foreground"
                         )}
                         aria-label={`Edit ${client.name}`}
@@ -327,7 +327,7 @@ export default function ClientsPage() {
                       <button
                         onClick={() => setDeletingId(client.id)}
                         className={cn(
-                          "cursor-pointer rounded-md p-2 text-muted-foreground",
+                          "cursor-pointer rounded-lg p-1.5 text-faint sm:p-2",
                           "transition-colors hover:bg-destructive/10 hover:text-destructive"
                         )}
                         aria-label={`Delete ${client.name}`}
@@ -353,7 +353,7 @@ export default function ClientsPage() {
             <button
               onClick={() => setPage((p) => p - 1)}
               disabled={page === 1}
-              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className="cursor-pointer rounded-lg border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Previous page"
             >
               <ChevronLeft size={16} />
@@ -364,7 +364,7 @@ export default function ClientsPage() {
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={page === pagination.totalPages}
-              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className="cursor-pointer rounded-lg border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Next page"
             >
               <ChevronRight size={16} />
@@ -384,9 +384,9 @@ export default function ClientsPage() {
 
       {/* Delete confirmation */}
       {deletingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-          <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-xl animate-in-up">
-            <h2 className="font-semibold text-foreground">Delete client?</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl animate-in-up">
+            <h2 className="text-[15px] font-medium text-foreground">Delete client?</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               This will also delete all invoices for this client. This cannot be
               undone.
@@ -394,18 +394,18 @@ export default function ClientsPage() {
             <div className="mt-5 flex justify-end gap-3">
               <button
                 onClick={() => setDeletingId(null)}
-                className="cursor-pointer rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
               >
                 Cancel
               </button>
               <button
                 onClick={() => deleteMutation.mutate(deletingId)}
                 disabled={deleteMutation.isPending}
-                className="cursor-pointer rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="cursor-pointer rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deleteMutation.isPending ? (
                   <span className="flex items-center gap-2">
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     Deleting…
                   </span>
                 ) : (

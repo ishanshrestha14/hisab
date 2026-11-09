@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Plus, RefreshCw, Pause, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/status";
 
 interface RecurringInvoice {
   id: string;
@@ -24,7 +24,6 @@ const INTERVAL_LABEL: Record<string, string> = {
 };
 
 export default function RecurringPage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<RecurringInvoice[]>({
@@ -54,24 +53,24 @@ export default function RecurringPage() {
   const schedules = data ?? [];
 
   return (
-    <div className="p-4 sm:p-8 animate-in-up">
+    <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-8 sm:py-8 animate-in-up">
       <div className="mb-6 sm:mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Recurring Invoices</h1>
+          <h1 className="text-2xl font-medium tracking-[-0.01em] text-foreground sm:text-[28px] sm:leading-9">Recurring invoices</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Auto-generate invoices on a schedule
           </p>
         </div>
         <Link
           to="/recurring/new"
-          className="flex cursor-pointer items-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
+          className="flex cursor-pointer items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400"
         >
           <Plus size={16} />
           New schedule
         </Link>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
+      <div className="rounded-xl border border-border bg-card">
         {isLoading ? (
           <div className="space-y-3 p-6">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -80,16 +79,14 @@ export default function RecurringPage() {
           </div>
         ) : schedules.length === 0 ? (
           <div className="flex flex-col items-center py-14">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <RefreshCw size={20} className="text-muted-foreground" />
-            </div>
+            <RefreshCw size={20} strokeWidth={1.5} className="mb-3 text-faint" />
             <p className="text-sm font-medium text-foreground">No recurring schedules yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Set up automatic invoicing for retainer clients
             </p>
             <Link
               to="/recurring/new"
-              className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+              className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400"
             >
               Create schedule
             </Link>
@@ -97,13 +94,13 @@ export default function RecurringPage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="px-6 py-3 font-medium">Client</th>
-                <th className="px-6 py-3 font-medium">Interval</th>
-                <th className="px-6 py-3 font-medium">Next Run</th>
-                <th className="px-6 py-3 text-right font-medium">Amount</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium" />
+              <tr className="border-b border-border text-left text-[13px] text-faint [&>th]:font-normal">
+                <th className="px-4 py-3 sm:px-6">Client</th>
+                <th className="hidden px-6 py-3 sm:table-cell">Interval</th>
+                <th className="hidden px-6 py-3 sm:table-cell">Next run</th>
+                <th className="px-4 py-3 text-right sm:px-6">Amount</th>
+                <th className="hidden px-6 py-3 sm:table-cell">Status</th>
+                <th className="px-6 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -112,38 +109,29 @@ export default function RecurringPage() {
                 return (
                   <tr
                     key={ri.id}
-                    onClick={() => navigate(`/recurring/${ri.id}`)}
-                    className="cursor-pointer border-b border-border last:border-0 transition-colors duration-100 hover:bg-accent/50"
+                    className="border-b border-border last:border-0 transition-colors hover:bg-muted/50"
                   >
-                    <td className="px-6 py-3 font-medium text-foreground">{ri.client.name}</td>
-                    <td className="px-6 py-3 text-muted-foreground">{INTERVAL_LABEL[ri.interval]}</td>
-                    <td className="px-6 py-3 text-muted-foreground">
-                      {new Date(ri.nextRunAt).toLocaleDateString("en-US", {
-                        month: "short", day: "numeric", year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-6 py-3 text-right font-medium text-foreground">
-                      {formatCurrency(total, ri.currency)}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
-                        ri.active
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-muted text-muted-foreground"
-                      )}>
-                        {ri.active ? "Active" : "Paused"}
+                    <td className="px-4 py-3 text-foreground sm:px-6">
+                      {ri.client.name}
+                      <span className="mt-0.5 block text-xs text-faint sm:hidden">
+                        {INTERVAL_LABEL[ri.interval]} · next {formatDate(ri.nextRunAt)} · {ri.active ? "Active" : "Paused"}
                       </span>
                     </td>
-                    <td className="px-6 py-3">
-                      <div
-                        className="flex items-center justify-end gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                    <td className="hidden px-6 py-3 text-muted-foreground sm:table-cell">{INTERVAL_LABEL[ri.interval]}</td>
+                    <td className="hidden whitespace-nowrap px-6 py-3 text-muted-foreground sm:table-cell">{formatDate(ri.nextRunAt)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-foreground sm:px-6">
+                      {formatCurrency(total, ri.currency)}
+                    </td>
+                    <td className="hidden px-6 py-3 sm:table-cell">
+                      <StatusBadge status={ri.active ? "ACTIVE" : "PAUSED"} />
+                    </td>
+                    <td className="px-2 py-3 sm:px-6">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => toggleActive.mutate({ id: ri.id, active: !ri.active })}
                           title={ri.active ? "Pause" : "Resume"}
-                          className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          aria-label={ri.active ? "Pause schedule" : "Resume schedule"}
+                          className="cursor-pointer rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                         >
                           {ri.active ? <Pause size={14} /> : <Play size={14} />}
                         </button>
@@ -154,7 +142,8 @@ export default function RecurringPage() {
                             }
                           }}
                           title="Delete"
-                          className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label="Delete schedule"
+                          className="cursor-pointer rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Trash2 size={14} />
                         </button>

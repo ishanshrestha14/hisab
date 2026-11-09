@@ -7,6 +7,7 @@ import { User, Palette, Bell, Shield, AlertCircle, Check } from "lucide-react";
 import { toast } from "sonner";
 import { authClient, useSession } from "@/lib/auth-client";
 import { useTheme } from "@/lib/theme";
+import { controlClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 
@@ -133,8 +134,7 @@ const COLOR_PRESETS = [
   { label: "Slate", value: "#64748b" },
 ];
 
-const inputBase =
-  "w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-colors duration-150";
+const inputBase = cn(controlClass, "py-2");
 
 function SectionHeader({
   icon: Icon,
@@ -146,12 +146,10 @@ function SectionHeader({
   description: string;
 }) {
   return (
-    <div className="flex items-start gap-3 mb-6">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/10">
-        <Icon size={17} className="text-brand" />
-      </div>
+    <div className="mb-6 flex items-start gap-3">
+      <Icon size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-faint" />
       <div>
-        <h2 className="font-semibold text-foreground">{title}</h2>
+        <h2 className="text-[15px] font-medium text-foreground">{title}</h2>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
     </div>
@@ -160,9 +158,7 @@ function SectionHeader({
 
 function ComingSoonBadge() {
   return (
-    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-      Coming soon
-    </span>
+    <span className="rounded-md border border-border px-1.5 py-0.5 text-xs text-faint">Coming soon</span>
   );
 }
 
@@ -247,7 +243,7 @@ export default function SettingsPage() {
   return (
     <div className="p-8 animate-in-up">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+        <h1 className="text-2xl font-medium tracking-[-0.01em] text-foreground sm:text-[28px] sm:leading-9">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage your account and preferences
         </p>
@@ -255,7 +251,7 @@ export default function SettingsPage() {
 
       <div className="max-w-2xl space-y-6">
         {/* Profile */}
-        <div className="rounded-lg border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           <SectionHeader
             icon={User}
             title="Profile"
@@ -304,25 +300,19 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 {/* Auth provider badge */}
                 {session?.user.image ? (
-                  <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                    Google account
-                  </span>
+                  <span className="text-xs text-faint">Signed in with Google</span>
                 ) : (
-                  <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-                    Email account
-                  </span>
+                  <span className="text-xs text-faint">Signed in with email and password</span>
                 )}
               </div>
               <button
                 type="submit"
                 disabled={isSubmitting || !isDirty}
                 className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98]",
+                  "flex cursor-pointer items-center gap-2 h-9 rounded-lg px-4 text-sm font-medium transition-colors",
                   saved
-                    ? "bg-green-600 text-white"
-                    : "bg-brand text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    ? "bg-muted text-foreground"
+                    : "bg-brand text-primary-foreground hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
                 )}
               >
                 {saved ? (
@@ -332,7 +322,7 @@ export default function SettingsPage() {
                   </>
                 ) : isSubmitting ? (
                   <>
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     Saving…
                   </>
                 ) : (
@@ -344,7 +334,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Appearance */}
-        <div className="rounded-lg border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           <SectionHeader
             icon={Palette}
             title="Appearance"
@@ -358,47 +348,45 @@ export default function SettingsPage() {
               <button
                 onClick={() => theme === "dark" && toggle()}
                 className={cn(
-                  "cursor-pointer rounded-lg border-2 p-4 text-left transition-all duration-150",
+                  "cursor-pointer rounded-xl border p-3 text-left transition-colors",
                   theme === "light"
-                    ? "border-brand bg-brand/5"
+                    ? "border-brand ring-1 ring-brand"
                     : "border-border hover:border-muted-foreground/30"
                 )}
               >
-                <div className="mb-2 h-8 w-full rounded-md bg-white border border-slate-200 shadow-sm" />
-                <div className="mb-1 flex items-center justify-between">
+                <div className="mb-3 h-10 w-full rounded-lg border border-[#e7e5e2] bg-[#fafaf9]" />
+                <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">Light</span>
                   {theme === "light" && (
-                    <Check size={14} className="text-brand" />
+                    <Check size={14} className="text-brand-ink" />
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">Clean and bright</p>
               </button>
 
               {/* Dark option */}
               <button
                 onClick={() => theme === "light" && toggle()}
                 className={cn(
-                  "cursor-pointer rounded-lg border-2 p-4 text-left transition-all duration-150",
+                  "cursor-pointer rounded-xl border p-3 text-left transition-colors",
                   theme === "dark"
-                    ? "border-brand bg-brand/5"
+                    ? "border-brand ring-1 ring-brand"
                     : "border-border hover:border-muted-foreground/30"
                 )}
               >
-                <div className="mb-2 h-8 w-full rounded-md bg-slate-900 border border-slate-700 shadow-sm" />
-                <div className="mb-1 flex items-center justify-between">
+                <div className="mb-3 h-10 w-full rounded-lg border border-[#2b2b2a] bg-[#141413]" />
+                <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">Dark</span>
                   {theme === "dark" && (
-                    <Check size={14} className="text-brand" />
+                    <Check size={14} className="text-brand-ink" />
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">Easy on the eyes</p>
               </button>
             </div>
           </div>
         </div>
 
         {/* Notifications — coming soon */}
-        <div className="rounded-lg border border-border bg-card p-6 opacity-70">
+        <div className="rounded-xl border border-border bg-card p-6 opacity-70">
           <div className="flex items-start justify-between mb-6">
             <SectionHeader
               icon={Bell}
@@ -416,7 +404,7 @@ export default function SettingsPage() {
             ].map((label) => (
               <div
                 key={label}
-                className="flex items-center justify-between rounded-md border border-border px-4 py-3"
+                className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
               >
                 <span className="text-sm text-foreground">{label}</span>
                 <div className="h-5 w-9 rounded-full bg-muted" />
@@ -426,7 +414,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Business & Tax */}
-        <div className="rounded-lg border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           <SectionHeader
             icon={Shield}
             title="Business & Tax"
@@ -438,7 +426,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  PAN Number
+                  PAN number
                 </label>
                 <input
                   {...registerTax("pan")}
@@ -460,7 +448,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  VAT Registration
+                  VAT registration
                 </label>
                 <input
                   {...registerTax("vatNumber")}
@@ -510,7 +498,7 @@ export default function SettingsPage() {
 
             {/* Invoice template */}
             <div>
-              <p className="mb-3 text-sm font-medium text-foreground">Invoice Template</p>
+              <p className="mb-3 text-sm font-medium text-foreground">Invoice template</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {TEMPLATES.map((tmpl) => (
                   <button
@@ -518,9 +506,9 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => setTaxValue("invoiceTemplate", tmpl.id, { shouldDirty: true })}
                     className={cn(
-                      "cursor-pointer rounded-lg border-2 p-3 text-left transition-all duration-150",
+                      "cursor-pointer rounded-lg border-2 p-3 text-left transition-colors",
                       selectedTemplate === tmpl.id
-                        ? "border-brand bg-brand/5"
+                        ? "border-brand ring-1 ring-brand"
                         : "border-border hover:border-muted-foreground/30"
                     )}
                   >
@@ -531,7 +519,7 @@ export default function SettingsPage() {
                         <p className="text-xs text-muted-foreground">{tmpl.description}</p>
                       </div>
                       {selectedTemplate === tmpl.id && (
-                        <Check size={14} className="text-brand shrink-0" />
+                        <Check size={14} className="text-brand-ink shrink-0" />
                       )}
                     </div>
                   </button>
@@ -541,7 +529,7 @@ export default function SettingsPage() {
 
             {/* Brand color */}
             <div>
-              <p className="mb-3 text-sm font-medium text-foreground">Accent Color</p>
+              <p className="mb-3 text-sm font-medium text-foreground">Accent colour</p>
               <div className="flex items-center gap-3">
                 {COLOR_PRESETS.map((preset) => (
                   <button
@@ -550,7 +538,7 @@ export default function SettingsPage() {
                     title={preset.label}
                     onClick={() => setTaxValue("brandColor", preset.value, { shouldDirty: true })}
                     className={cn(
-                      "h-8 w-8 cursor-pointer rounded-full border-2 transition-all duration-150",
+                      "h-8 w-8 cursor-pointer rounded-full border-2 transition-colors",
                       selectedColor === preset.value
                         ? "border-foreground scale-110 shadow-md"
                         : "border-transparent hover:scale-105"
@@ -569,10 +557,10 @@ export default function SettingsPage() {
                 type="submit"
                 disabled={isTaxSubmitting || !isTaxDirty}
                 className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98]",
+                  "flex cursor-pointer items-center gap-2 h-9 rounded-lg px-4 text-sm font-medium transition-colors",
                   taxSaved
-                    ? "bg-green-600 text-white"
-                    : "bg-brand text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    ? "bg-muted text-foreground"
+                    : "bg-brand text-primary-foreground hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
                 )}
               >
                 {taxSaved ? (
@@ -582,7 +570,7 @@ export default function SettingsPage() {
                   </>
                 ) : isTaxSubmitting ? (
                   <>
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     Saving…
                   </>
                 ) : (

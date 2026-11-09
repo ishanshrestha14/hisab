@@ -48,12 +48,12 @@ export default function SignupPage() {
       <div className="w-full max-w-sm animate-in-up">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand text-white text-2xl font-bold select-none shadow-sm">
+          <div className="mx-auto mb-5 flex h-10 w-10 select-none items-center justify-center rounded-xl bg-primary text-xl font-semibold text-primary-foreground">
             ह
           </div>
-          <h1 className="text-2xl font-semibold text-foreground">Create your account</h1>
+          <h1 className="text-2xl font-medium tracking-[-0.01em] text-foreground">Create your account</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Start managing invoices for free
+            Bill foreign clients and track what you earn in NPR
           </p>
         </div>
 
@@ -146,7 +146,7 @@ export default function SignupPage() {
 
           {/* Server error */}
           {serverError && (
-            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5">
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5">
               <AlertCircle size={15} className="mt-0.5 shrink-0 text-destructive" />
               <p className="text-sm text-destructive">{serverError}</p>
             </div>
@@ -155,11 +155,11 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full cursor-pointer rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full cursor-pointer rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 Creating account…
               </span>
             ) : (
@@ -176,7 +176,7 @@ export default function SignupPage() {
 
         <button
           onClick={handleGoogleSignIn}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-150 hover:bg-accent active:scale-[0.98]"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -189,7 +189,7 @@ export default function SignupPage() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link to="/login" className="font-medium text-brand transition-colors hover:text-brand-600 hover:underline">
+          <Link to="/login" className="font-medium text-brand-ink transition-colors hover:text-foreground hover:underline">
             Sign in
           </Link>
         </p>

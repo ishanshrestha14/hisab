@@ -15,13 +15,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import {
   createTimeEntrySchema,
   generateInvoiceFromTimeSchema,
   type CreateTimeEntryInput,
   type GenerateInvoiceFromTimeInput,
 } from "@hisab/shared";
+import { controlClass } from "@/components/ui/field";
 
 interface Client {
   id: string;
@@ -51,8 +52,7 @@ interface Pagination {
 
 const CURRENCIES = ["USD", "GBP", "EUR", "NPR"] as const;
 
-const inputClass =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/30 transition-colors duration-150";
+const inputClass = cn(controlClass, "py-2");
 
 function TimeEntryDialog({
   entry,
@@ -113,15 +113,15 @@ function TimeEntryDialog({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg border border-border bg-card shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl border border-border bg-popover shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-semibold text-foreground">
-            {isEdit ? "Edit Time Entry" : "Log Time"}
+          <h2 className="text-[15px] font-medium text-foreground">
+            {isEdit ? "Edit time entry" : "Log time"}
           </h2>
           <button
             onClick={onClose}
-            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X size={18} />
           </button>
@@ -200,7 +200,7 @@ function TimeEntryDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Hourly Rate *
+                Hourly rate *
               </label>
               <input
                 {...register("hourlyRate", { valueAsNumber: true })}
@@ -227,9 +227,9 @@ function TimeEntryDialog({
           </div>
 
           {hours > 0 && rate > 0 && (
-            <div className="rounded-md bg-muted/50 px-4 py-2.5 text-sm">
+            <div className="rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
               <span className="text-muted-foreground">Total: </span>
-              <span className="font-semibold text-foreground">
+              <span className="text-[15px] font-medium text-foreground">
                 {formatCurrency(hours * rate, currency)}
               </span>
             </div>
@@ -239,18 +239,18 @@ function TimeEntryDialog({
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="cursor-pointer rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="cursor-pointer rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {mutation.isPending ? (
                 <span className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Saving…
                 </span>
               ) : isEdit ? (
@@ -302,13 +302,13 @@ function GenerateInvoiceDialog({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg border border-border bg-card shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl border border-border bg-popover shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-semibold text-foreground">Generate Invoice</h2>
+          <h2 className="text-[15px] font-medium text-foreground">Generate invoice</h2>
           <button
             onClick={onClose}
-            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <X size={18} />
           </button>
@@ -319,7 +319,7 @@ function GenerateInvoiceDialog({
           className="space-y-4 p-6"
         >
           {/* Summary */}
-          <div className="rounded-md border border-border bg-muted/30 p-4 text-sm space-y-1.5">
+          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-1.5">
             <div className="flex justify-between text-muted-foreground">
               <span>Entries</span>
               <span>{entries.length}</span>
@@ -336,7 +336,7 @@ function GenerateInvoiceDialog({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Due Date *
+              Due date *
             </label>
             <input
               {...register("dueDate")}
@@ -366,18 +366,18 @@ function GenerateInvoiceDialog({
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="cursor-pointer rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="cursor-pointer rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {mutation.isPending ? (
                 <span className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Creating…
                 </span>
               ) : (
@@ -451,17 +451,17 @@ export default function TimePage() {
       : null;
 
   return (
-    <div className="p-4 sm:p-8 animate-in-up">
+    <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-8 sm:py-8 animate-in-up">
       <div className="mb-5 sm:mb-8 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Time Tracking</h1>
+          <h1 className="text-2xl font-medium tracking-[-0.01em] text-foreground sm:text-[28px] sm:leading-9">Time</h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             Log hours and generate invoices from your timesheet
           </p>
         </div>
         <button
           onClick={() => setDialog({ type: "entry" })}
-          className="flex shrink-0 cursor-pointer items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
+          className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400"
         >
           <Plus size={16} />
           <span className="hidden sm:inline">Log time</span>
@@ -472,7 +472,7 @@ export default function TimePage() {
       {/* Tabs — dropdown on mobile, tabs on desktop */}
       <div className="mb-4">
         <select
-          className="sm:hidden rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground capitalize focus:outline-none focus:ring-2 focus:ring-brand/30"
+          className="sm:hidden rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground capitalize focus:outline-none focus:ring-2 focus:ring-brand/30"
           value={tab}
           onChange={(e) => { setTab(e.target.value as Tab); setPage(1); setSelected(new Set()); }}
         >
@@ -485,11 +485,7 @@ export default function TimePage() {
             <button
               key={t}
               onClick={() => { setTab(t); setPage(1); setSelected(new Set()); }}
-              className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 -mb-px capitalize ${
-                tab === t
-                  ? "border-brand text-brand"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex cursor-pointer items-center gap-1.5 -mb-px border-b-2 px-3 h-10 text-sm transition-colors capitalize ${ tab === t ? "border-brand text-foreground" : "border-transparent text-muted-foreground hover:text-foreground" }`}
             >
               {t}
             </button>
@@ -499,7 +495,7 @@ export default function TimePage() {
 
       {/* Generate invoice bar */}
       {tab === "unbilled" && selected.size > 0 && (
-        <div className="mb-4 flex items-center justify-between rounded-md border border-brand/30 bg-brand/5 px-4 py-3">
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-brand/30 bg-brand/5 px-4 py-3">
           <div className="text-sm">
             {selectionError ? (
               <span className="text-destructive">{selectionError}</span>
@@ -527,7 +523,7 @@ export default function TimePage() {
             <button
               disabled={!canGenerateInvoice}
               onClick={() => setDialog({ type: "invoice" })}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileText size={14} />
               Generate invoice
@@ -536,7 +532,7 @@ export default function TimePage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card">
+      <div className="rounded-xl border border-border bg-card">
         {isLoading ? (
           <div className="space-y-3 p-6">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -545,9 +541,7 @@ export default function TimePage() {
           </div>
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center py-14">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <Clock size={20} className="text-muted-foreground" />
-            </div>
+            <Clock size={20} strokeWidth={1.5} className="mb-3 text-faint" />
             <p className="text-sm font-medium text-foreground">
               {tab === "unbilled" ? "No unbilled entries" : "No billed entries yet"}
             </p>
@@ -559,7 +553,7 @@ export default function TimePage() {
             {tab === "unbilled" && (
               <button
                 onClick={() => setDialog({ type: "entry" })}
-                className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-brand-400"
               >
                 Log time
               </button>
@@ -568,10 +562,11 @@ export default function TimePage() {
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border text-left text-[13px] text-faint [&>th]:font-normal">
                 {tab === "unbilled" && (
-                  <th className="px-4 py-3">
+                  <th className="w-10 px-3 py-3 sm:px-4">
                     <input
+                      aria-label="Select all entries"
                       type="checkbox"
                       checked={selected.size === entries.length && entries.length > 0}
                       onChange={toggleAll}
@@ -579,27 +574,26 @@ export default function TimePage() {
                     />
                   </th>
                 )}
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Description</th>
-                <th className="px-6 py-3">Client</th>
-                <th className="px-6 py-3 text-right">Hours</th>
-                <th className="px-6 py-3 text-right">Rate</th>
-                <th className="px-6 py-3 text-right">Total</th>
-                {tab === "billed" && <th className="px-6 py-3">Invoice</th>}
-                {tab === "unbilled" && <th className="px-6 py-3" />}
+                <th className="hidden px-6 py-3 sm:table-cell">Date</th>
+                <th className="px-3 py-3 sm:px-6">Description</th>
+                <th className="hidden px-6 py-3 md:table-cell">Client</th>
+                <th className="px-3 py-3 text-right sm:px-6">Hours</th>
+                <th className="hidden px-6 py-3 text-right md:table-cell">Rate</th>
+                <th className="px-3 py-3 text-right sm:px-6">Total</th>
+                {tab === "billed" && <th className="px-3 py-3 sm:px-6">Invoice</th>}
+                {tab === "unbilled" && <th className="px-1 py-3 sm:px-6"><span className="sr-only">Actions</span></th>}
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
                 <tr
                   key={entry.id}
-                  className={`border-b border-border last:border-0 transition-colors ${
-                    selected.has(entry.id) ? "bg-brand/5" : "hover:bg-accent/50"
-                  }`}
+                  className={`border-b border-border last:border-0 transition-colors ${ selected.has(entry.id) ? "bg-brand/[0.06]" : "hover:bg-accent/50" }`}
                 >
                   {tab === "unbilled" && (
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <input
+                        aria-label={`Select ${entry.description}`}
                         type="checkbox"
                         checked={selected.has(entry.id)}
                         onChange={() => toggleSelect(entry.id)}
@@ -607,20 +601,22 @@ export default function TimePage() {
                       />
                     </td>
                   )}
-                  <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">
-                    {new Date(entry.date).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                  <td className="hidden whitespace-nowrap px-6 py-3 text-muted-foreground sm:table-cell">
+                    {formatDate(entry.date)}
                   </td>
-                  <td className="px-6 py-3 text-foreground">{entry.description}</td>
-                  <td className="px-6 py-3 text-muted-foreground">{entry.client.name}</td>
-                  <td className="px-6 py-3 text-right text-muted-foreground">{entry.hours}h</td>
-                  <td className="px-6 py-3 text-right text-muted-foreground">
+                  <td className="px-3 py-3 text-foreground sm:px-6">
+                    {entry.description}
+                    <span className="mt-0.5 block text-xs text-faint md:hidden">
+                      <span className="sm:hidden">{formatDate(entry.date)} · </span>
+                      {entry.client.name} · {formatCurrency(entry.hourlyRate, entry.currency)}/hr
+                    </span>
+                  </td>
+                  <td className="hidden px-6 py-3 text-muted-foreground md:table-cell">{entry.client.name}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-muted-foreground sm:px-6">{entry.hours}h</td>
+                  <td className="hidden px-6 py-3 text-right tabular-nums text-muted-foreground md:table-cell">
                     {formatCurrency(entry.hourlyRate, entry.currency)}/hr
                   </td>
-                  <td className="px-6 py-3 text-right font-medium text-foreground">
+                  <td className="px-3 py-3 text-right tabular-nums text-foreground sm:px-6">
                     {formatCurrency(entry.hours * entry.hourlyRate, entry.currency)}
                   </td>
                   {tab === "billed" && (
@@ -628,7 +624,7 @@ export default function TimePage() {
                       {entry.invoice ? (
                         <a
                           href={`/invoices/${entry.invoice.id}`}
-                          className="text-brand hover:underline text-xs font-medium"
+                          className="text-brand-ink hover:underline text-xs font-medium"
                         >
                           {entry.invoice.number}
                         </a>
@@ -638,11 +634,11 @@ export default function TimePage() {
                     </td>
                   )}
                   {tab === "unbilled" && (
-                    <td className="px-6 py-3">
+                    <td className="px-1 py-3 sm:px-6">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setDialog({ type: "entry", entry })}
-                          className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           aria-label="Edit entry"
                         >
                           <Pencil size={14} />
@@ -650,7 +646,7 @@ export default function TimePage() {
                         <button
                           onClick={() => deleteEntry.mutate(entry.id)}
                           disabled={deleteEntry.isPending}
-                          className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                          className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
                           aria-label="Delete entry"
                         >
                           <Trash2 size={14} />
@@ -663,17 +659,21 @@ export default function TimePage() {
             </tbody>
             <tfoot>
               <tr className="border-t border-border bg-muted/30">
-                <td
-                  colSpan={tab === "unbilled" ? 4 : 3}
-                  className="px-6 py-3 text-sm text-muted-foreground"
-                >
+                {/* Label spans the columns before Hours, which differ by breakpoint */}
+                <td colSpan={tab === "unbilled" ? 2 : 1} className="px-3 py-3 text-sm text-muted-foreground sm:hidden">
+                  Total
+                </td>
+                <td colSpan={tab === "unbilled" ? 3 : 2} className="hidden px-6 py-3 text-sm text-muted-foreground sm:table-cell md:hidden">
                   Total (this page)
                 </td>
-                <td className="px-6 py-3 text-right font-medium text-muted-foreground">
+                <td colSpan={tab === "unbilled" ? 4 : 3} className="hidden px-6 py-3 text-sm text-muted-foreground md:table-cell">
+                  Total (this page)
+                </td>
+                <td className="px-3 py-3 text-right tabular-nums text-muted-foreground sm:px-6">
                   {entries.reduce((s, e) => s + e.hours, 0).toFixed(2)}h
                 </td>
-                <td />
-                <td className="px-6 py-3 text-right font-semibold text-foreground">
+                <td className="hidden md:table-cell" />
+                <td className="px-3 py-3 text-right font-medium tabular-nums text-foreground sm:px-6">
                   {(() => {
                     const byCurrency: Record<string, number> = {};
                     entries.forEach((e) => {
@@ -684,7 +684,7 @@ export default function TimePage() {
                     ));
                   })()}
                 </td>
-                <td colSpan={tab === "unbilled" ? 2 : 1} />
+                <td />
               </tr>
             </tfoot>
           </table></div>
@@ -701,7 +701,7 @@ export default function TimePage() {
             <button
               onClick={() => setPage((p) => p - 1)}
               disabled={page === 1}
-              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className="cursor-pointer rounded-lg border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft size={16} />
             </button>
@@ -709,7 +709,7 @@ export default function TimePage() {
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={page === pagination.totalPages}
-              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className="cursor-pointer rounded-lg border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronRight size={16} />
             </button>

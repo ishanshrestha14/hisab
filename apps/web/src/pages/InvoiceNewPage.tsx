@@ -4,8 +4,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { createInvoiceSchema, type CreateInvoiceInput, type Currency } from "@hisab/shared";
+import { controlClass } from "@/components/ui/field";
 
 interface Client {
   id: string;
@@ -15,8 +16,7 @@ interface Client {
 
 const CURRENCIES = ["USD", "GBP", "EUR", "NPR"] as const;
 
-const inputClass =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand";
+const inputClass = cn(controlClass, "py-2");
 const labelClass = "mb-1.5 block text-sm font-medium text-foreground";
 const errorClass = "mt-1 text-xs text-destructive";
 
@@ -42,7 +42,7 @@ function LineItemsTable({
       <div className="mb-2 grid grid-cols-[1fr_100px_120px_80px] gap-2 text-xs font-medium text-muted-foreground">
         <span>Description</span>
         <span>Qty</span>
-        <span>Unit Price</span>
+        <span>Unit price</span>
         <span className="text-right">Total</span>
       </div>
 
@@ -113,7 +113,7 @@ function LineItemsTable({
         <button
           type="button"
           onClick={() => append({ description: "", quantity: 1, unitPrice: 0 })}
-          className="flex items-center gap-1.5 text-sm text-brand hover:underline"
+          className="flex items-center gap-1.5 text-sm text-brand-ink hover:underline"
         >
           <Plus size={14} />
           Add line item
@@ -188,7 +188,7 @@ export default function InvoiceNewPage() {
   return (
     <div className="p-4 sm:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-foreground">New Invoice</h1>
+        <h1 className="text-2xl font-medium tracking-[-0.01em] text-foreground sm:text-[28px] sm:leading-9">New invoice</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Fill in the details to create an invoice
         </p>
@@ -197,7 +197,7 @@ export default function InvoiceNewPage() {
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))}>
         <div className="space-y-6">
           {/* Client + currency + dates */}
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <h2 className="mb-4 font-medium text-foreground">Details</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
@@ -221,7 +221,7 @@ export default function InvoiceNewPage() {
                 {clients.length === 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     No clients yet.{" "}
-                    <a href="/clients" className="text-brand hover:underline">Add one first</a>
+                    <a href="/clients" className="text-brand-ink hover:underline">Add one first</a>
                   </p>
                 )}
               </div>
@@ -238,7 +238,7 @@ export default function InvoiceNewPage() {
               <div />
 
               <div>
-                <label className={labelClass}>Issue Date *</label>
+                <label className={labelClass}>Issue date *</label>
                 <input
                   {...register("issueDate")}
                   type="date"
@@ -250,7 +250,7 @@ export default function InvoiceNewPage() {
               </div>
 
               <div>
-                <label className={labelClass}>Due Date *</label>
+                <label className={labelClass}>Due date *</label>
                 <input
                   {...register("dueDate")}
                   type="date"
@@ -264,13 +264,13 @@ export default function InvoiceNewPage() {
           </div>
 
           {/* Line items */}
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 font-medium text-foreground">Line Items</h2>
+          <div className="rounded-xl border border-border bg-card p-6">
+            <h2 className="mb-4 font-medium text-foreground">Line items</h2>
             <LineItemsTable control={control} register={register} errors={errors} />
           </div>
 
           {/* Notes + TDS + total */}
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div className="space-y-4">
                 <div>
@@ -284,7 +284,7 @@ export default function InvoiceNewPage() {
                 </div>
                 <div>
                   <label className={labelClass}>
-                    TDS Rate (%)
+                    TDS rate (%)
                     <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                       Nepal standard: 15%
                     </span>
@@ -310,19 +310,19 @@ export default function InvoiceNewPage() {
                       <span>Gross</span>
                       <span>{formatCurrency(subtotal, selectedCurrency)}</span>
                     </div>
-                    <div className="flex justify-between text-red-500">
+                    <div className="flex justify-between text-negative">
                       <span>TDS ({tdsPercent}%)</span>
                       <span>−{formatCurrency(tdsAmount, selectedCurrency)}</span>
                     </div>
                     <div className="flex justify-between border-t border-border pt-1.5 font-semibold text-foreground">
-                      <span>Net Receivable</span>
+                      <span>Net receivable</span>
                       <span>{formatCurrency(netReceivable, selectedCurrency)}</span>
                     </div>
                   </div>
                 ) : (
                   <>
                     <p className="text-sm text-muted-foreground">Total</p>
-                    <p className="mt-1 text-3xl font-bold text-foreground">
+                    <p className="mt-1 text-3xl font-medium text-foreground">
                       {formatCurrency(subtotal, selectedCurrency)}
                     </p>
                   </>
@@ -332,7 +332,7 @@ export default function InvoiceNewPage() {
           </div>
 
           {mutation.error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {mutation.error.message}
             </p>
           )}
@@ -342,16 +342,16 @@ export default function InvoiceNewPage() {
             <button
               type="button"
               onClick={() => navigate("/invoices")}
-              className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || mutation.isPending}
-              className="rounded-md bg-brand px-6 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+              className="rounded-lg bg-brand px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-brand-400 disabled:opacity-60"
             >
-              {mutation.isPending ? "Creating…" : "Create Invoice"}
+              {mutation.isPending ? "Creating…" : "Create invoice"}
             </button>
           </div>
         </div>
