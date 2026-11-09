@@ -33,6 +33,12 @@ export interface StatementInvoice {
   tdsPercent: number;
   tdsAmount: number;
   netReceivable: number;
+  /** Payments recorded against the invoice */
+  amountPaid: number;
+  /** Net receivable once PAID, payments so far while open, 0 for drafts */
+  collected: number;
+  /** Net receivable minus payments while open, otherwise 0 */
+  balance: number;
 }
 
 export interface StatementPDFProps {
@@ -96,21 +102,22 @@ const s = StyleSheet.create({
   tdText:        { fontSize: 8, color: "#374151" },
   tdBold:        { fontSize: 8, fontWeight: 600, color: "#111827" },
   colNum:        { width: 60 },
-  colDate:       { width: 70 },
-  colDue:        { width: 70 },
-  colStatus:     { width: 50 },
-  colCurrency:   { width: 44 },
+  colDate:       { width: 56 },
+  colDue:        { width: 56 },
+  colStatus:     { width: 44 },
+  colCurrency:   { width: 32 },
   colAmt:        { flex: 1, textAlign: "right" },
-  colTDS:        { width: 64, textAlign: "right" },
-  colNet:        { width: 80, textAlign: "right" },
+  colTDS:        { width: 58, textAlign: "right" },
+  colNet:        { width: 70, textAlign: "right" },
+  colBal:        { width: 70, textAlign: "right" },
   // Summary
   summarySection: { marginTop: 20, alignItems: "flex-end" },
   summaryRow:    { flexDirection: "row", paddingVertical: 3, paddingHorizontal: 6 },
   summaryLabel:  { width: 110, fontSize: 8, color: "#6b7280", textAlign: "right", paddingRight: 12 },
-  summaryValue:  { width: 90, fontSize: 8, color: "#374151", textAlign: "right" },
-  summaryRule:   { borderTopWidth: 1.5, borderTopColor: "#111827", width: 206, marginTop: 3, marginBottom: 3 },
+  summaryValue:  { width: 190, fontSize: 8, color: "#374151", textAlign: "right" },
+  summaryRule:   { borderTopWidth: 1.5, borderTopColor: "#111827", width: 312, marginTop: 3, marginBottom: 3 },
   grandLabel:    { width: 110, fontSize: 10, fontWeight: 600, color: "#111827", textAlign: "right", paddingRight: 12 },
-  grandValue:    { width: 90, fontSize: 10, fontWeight: 600, color: "#111827", textAlign: "right" },
+  grandValue:    { width: 190, fontSize: 10, fontWeight: 600, color: "#111827", textAlign: "right" },
   // Footer
   footer:        { position: "absolute", bottom: 24, left: 44, right: 44, flexDirection: "row", justifyContent: "space-between" },
   footerText:    { fontSize: 7, color: "#d1d5db" },
@@ -122,6 +129,14 @@ export function StatementPDF({ client, freelancer, invoices, summary, generatedA
   const currencies = [...new Set(invoices.map((i) => i.currency))];
   const isMixed = currencies.length > 1;
   const hasTDS = invoices.some((i) => i.tdsPercent > 0);
+
+  // Summary per currency, so amounts in different currencies never add up
+  const sumBy = (field: "total" | "collected" | "balance") =>
+    currencies
+      .map((cur) => [cur, invoices.filter((i) => i.currency === cur).reduce((n, i) => n + i[field], 0)] as const)
+      .filter(([, amount], _, all) => amount > 0 || all.length === 1)
+      .map(([cur, amount]) => formatCurrency(amount, cur))
+      .join(" + ") || formatCurrency(0, currencies[0] ?? "USD");
 
   return (
     <Document>
@@ -168,6 +183,7 @@ export function StatementPDF({ client, freelancer, invoices, summary, generatedA
           <Text style={[s.thText, s.colAmt]}>Amount</Text>
           {hasTDS && <Text style={[s.thText, s.colTDS]}>TDS</Text>}
           {hasTDS && <Text style={[s.thText, s.colNet]}>Net</Text>}
+          <Text style={[s.thText, s.colBal]}>Balance</Text>
         </View>
 
         {/* Invoice rows */}
@@ -200,6 +216,9 @@ export function StatementPDF({ client, freelancer, invoices, summary, generatedA
                   : formatCurrency(inv.total, inv.currency)}
               </Text>
             )}
+            <Text style={[s.tdText, s.colBal, { color: inv.balance > 0 ? "#111827" : "#9ca3af" }]}>
+              {inv.balance > 0 ? formatCurrency(inv.balance, inv.currency) : "—"}
+            </Text>
           </View>
         ))}
 
@@ -208,26 +227,26 @@ export function StatementPDF({ client, freelancer, invoices, summary, generatedA
           <View style={s.summaryRow}>
             <Text style={s.summaryLabel}>Total Invoiced ({summary.invoiceCount})</Text>
             <Text style={s.summaryValue}>
-              {isMixed ? `${summary.invoiceCount} invoices` : formatCurrency(summary.totalInvoiced, currencies[0] ?? "USD")}
+              {sumBy("total")}
             </Text>
           </View>
           <View style={s.summaryRow}>
-            <Text style={s.summaryLabel}>Collected ({summary.paidCount} paid)</Text>
+            <Text style={s.summaryLabel}>Received ({summary.paidCount} paid)</Text>
             <Text style={[s.summaryValue, { color: "#16a34a" }]}>
-              {isMixed ? `${summary.paidCount} invoices` : formatCurrency(summary.totalPaid, currencies[0] ?? "USD")}
+              {sumBy("collected")}
             </Text>
           </View>
           <View style={s.summaryRow}>
             <Text style={s.summaryLabel}>Outstanding</Text>
             <Text style={[s.summaryValue, { color: summary.totalOutstanding > 0 ? "#2563eb" : "#6b7280" }]}>
-              {isMixed ? `${summary.invoiceCount - summary.paidCount} invoices` : formatCurrency(summary.totalOutstanding, currencies[0] ?? "USD")}
+              {sumBy("balance")}
             </Text>
           </View>
           <View style={s.summaryRule} />
           <View style={s.summaryRow}>
-            <Text style={s.grandLabel}>Balance Due</Text>
+            <Text style={s.grandLabel}>Balance due</Text>
             <Text style={[s.grandValue, { color: summary.totalOutstanding > 0 ? "#dc2626" : "#16a34a" }]}>
-              {isMixed ? (summary.totalOutstanding > 0 ? "See above" : "Nil") : formatCurrency(summary.totalOutstanding, currencies[0] ?? "USD")}
+              {summary.totalOutstanding > 0 ? sumBy("balance") : "Nil"}
             </Text>
           </View>
         </View>
@@ -236,7 +255,7 @@ export function StatementPDF({ client, freelancer, invoices, summary, generatedA
         <View style={s.footer}>
           <Text style={s.footerText}>Generated by Hisab — open-source invoicing for Nepali freelancers</Text>
           {hasTDS && (
-            <Text style={s.footerNote}>* TDS amounts withheld and deposited with IRD by client</Text>
+            <Text style={s.footerNote}>* TDS is withheld and deposited with IRD by the client; balances are net of TDS</Text>
           )}
         </View>
       </Page>

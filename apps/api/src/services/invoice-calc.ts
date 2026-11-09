@@ -53,3 +53,20 @@ export function paymentExceedsBalance(payable: number, alreadyPaid: number, amou
 export function isFullyPaid(payable: number, paid: number): boolean {
   return paid >= payable - MONEY_EPSILON;
 }
+
+/**
+ * Where an invoice stands for collected/outstanding reporting. Mirrors the
+ * SQL in the dashboard and fiscal-year report:
+ * - PAID: the net receivable was collected, nothing is owed (even if it was
+ *   marked paid without payment records)
+ * - SENT / OVERDUE: payments so far are collected, the rest is owed
+ * - DRAFT: not billed yet, neither collected nor owed
+ */
+export function settlement(status: string, totals: Pick<InvoiceTotals, "netReceivable" | "amountPaid">) {
+  if (status === "PAID") return { collected: totals.netReceivable, balance: 0 };
+  if (status === "SENT" || status === "OVERDUE") {
+    const collected = Math.min(totals.amountPaid, totals.netReceivable);
+    return { collected, balance: Math.max(0, totals.netReceivable - totals.amountPaid) };
+  }
+  return { collected: 0, balance: 0 };
+}

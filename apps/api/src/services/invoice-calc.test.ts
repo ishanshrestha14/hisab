@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeInvoiceTotals,
   isFullyPaid,
+  settlement,
   lineItemTotal,
   paymentExceedsBalance,
   sumLineItems,
@@ -108,5 +109,26 @@ describe("isFullyPaid", () => {
   it("tolerates float rounding noise", () => {
     expect(isFullyPaid(0.3, 0.1 + 0.2)).toBe(true);
     expect(isFullyPaid(0.30000000000000004, 0.3)).toBe(true);
+  });
+});
+
+describe("settlement", () => {
+  const totals = { netReceivable: 850, amountPaid: 300 };
+
+  it("counts payments so far on an open invoice", () => {
+    expect(settlement("SENT", totals)).toEqual({ collected: 300, balance: 550 });
+    expect(settlement("OVERDUE", totals)).toEqual({ collected: 300, balance: 550 });
+  });
+
+  it("treats a PAID invoice as collected at its net", () => {
+    expect(settlement("PAID", { netReceivable: 850, amountPaid: 0 })).toEqual({ collected: 850, balance: 0 });
+  });
+
+  it("ignores drafts", () => {
+    expect(settlement("DRAFT", totals)).toEqual({ collected: 0, balance: 0 });
+  });
+
+  it("never collects more than the net receivable", () => {
+    expect(settlement("SENT", { netReceivable: 850, amountPaid: 900 })).toEqual({ collected: 850, balance: 0 });
   });
 });

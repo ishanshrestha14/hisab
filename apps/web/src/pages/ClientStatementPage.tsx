@@ -33,14 +33,14 @@ interface StatementData {
 
 type Totals = { invoiced: number; paid: number; outstanding: number };
 
-/** Same rule as the API summary, split by currency so amounts never mix */
+/** The API's per-invoice figures, summed by currency so amounts never mix */
 function totalsByCurrency(invoices: StatementInvoice[]): [string, Totals][] {
   const map = new Map<string, Totals>();
   for (const inv of invoices) {
     const t = map.get(inv.currency) ?? { invoiced: 0, paid: 0, outstanding: 0 };
     t.invoiced += inv.total;
-    if (inv.status === "PAID") t.paid += inv.total;
-    else if (inv.status === "SENT" || inv.status === "OVERDUE") t.outstanding += inv.total;
+    t.paid += inv.collected;
+    t.outstanding += inv.balance;
     map.set(inv.currency, t);
   }
   return [...map.entries()];
@@ -148,7 +148,8 @@ export default function ClientStatementPage() {
                 <Th>Status</Th>
                 <Th align="right">Amount</Th>
                 {hasTds && <Th align="right" className="hidden md:table-cell">TDS</Th>}
-                {hasTds && <Th align="right">Net</Th>}
+                {hasTds && <Th align="right" className="hidden sm:table-cell">Net</Th>}
+                <Th align="right">Balance</Th>
               </THead>
               <tbody>
                 {invoices.map((inv) => (
@@ -176,10 +177,24 @@ export default function ClientStatementPage() {
                       </Td>
                     )}
                     {hasTds && (
-                      <Td align="right" className="text-foreground">
+                      <Td align="right" className="hidden text-foreground sm:table-cell">
                         <Money amount={inv.tdsPercent > 0 ? inv.netReceivable : inv.total} currency={inv.currency} />
                       </Td>
                     )}
+                    <Td align="right" className="text-foreground">
+                      {inv.balance > 0 ? (
+                        <>
+                          <Money amount={inv.balance} currency={inv.currency} />
+                          {inv.amountPaid > 0 && (
+                            <span className="block text-xs text-faint">
+                              <Money amount={inv.amountPaid} currency={inv.currency} /> received
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-faint">—</span>
+                      )}
+                    </Td>
                   </Tr>
                 ))}
               </tbody>
@@ -195,7 +210,7 @@ export default function ClientStatementPage() {
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4 text-muted-foreground">
-                  <dt>Paid</dt>
+                  <dt>Received</dt>
                   <dd className="text-right">
                     <Amounts rows={rows} field="paid" />
                   </dd>
@@ -214,7 +229,11 @@ export default function ClientStatementPage() {
                     )}
                   </dd>
                 </div>
-                {hasTds && <p className="pt-1 text-right text-xs text-faint">Amounts are gross, before TDS</p>}
+                {hasTds && (
+                  <p className="pt-1 text-right text-xs text-faint">
+                    Balance is net of TDS, which the client deposits with IRD
+                  </p>
+                )}
               </dl>
             </div>
           </>
