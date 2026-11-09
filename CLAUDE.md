@@ -65,13 +65,22 @@ pnpm dev                              # starts all apps via turbo
 - API calls via `src/lib/api.ts` wrapper (handles credentials and JSON)
 - Auth state via `useSession()` from `src/lib/auth-client.ts`
 - Utility: `cn()` from `src/lib/utils.ts` for merging Tailwind classes
+- UI building blocks from `src/components/ui/` (`Button`, `Field`/`Input`/`Select`, `StatusBadge`, `Page`/`PageHeader`/`Panel`, `Table`/`Pager`, `Modal`, `Money`/`TotalFigure`) — don't redefine `inputClass` or status colour maps per page
+- Dates via `formatDate(date, "short" | "long" | "month")` from `src/lib/utils.ts`
+- List filters and pagination live in the URL (`useSearchParams`) and are applied by the API, never client-side on one page
+- Theme via `useTheme()` from `src/lib/theme.ts` (one shared store)
+
+### Money rules
+- Never add amounts in different currencies. Show per-currency figures, or convert each to NPR first (`byCurrency` + `*NPR` fields from the API)
+- TDS invoices settle at the **net receivable** (gross − TDS); balances, overpayment checks and auto-PAID all use it
+- Collected / outstanding follow `settlement()` in `apps/api/src/services/invoice-calc.ts`: PAID → net collected; SENT/OVERDUE → payments collected, net − payments owed; DRAFT → neither. Mirror it in any new SQL aggregate
 
 ## Workspace packages
 - `@hisab/db` — import `prisma` client and Prisma-generated types
 - `@hisab/shared` — import Zod schemas and inferred TypeScript types
 
 ## Database schema summary
-Models: `User`, `Session`, `Account`, `Verification`, `Client`, `Invoice`, `LineItem`, `ExchangeRate`, `AuditLog`, `IdempotencyKey`
+Models: `User`, `Session`, `Account`, `Verification`, `Client`, `Invoice`, `LineItem`, `Payment`, `Quote`, `RecurringInvoice`, `Expense`, `TimeEntry`, `ExchangeRate`, `AuditLog`, `IdempotencyKey` (see `schema.prisma` for the full list)
 Enums: `Currency` (USD, GBP, EUR, NPR), `InvoiceStatus` (DRAFT, SENT, PAID, OVERDUE)
 
 Key: `Invoice.token` is the public cuid used for `/portal/:token` — never expose `Invoice.id` publicly.
@@ -84,10 +93,15 @@ Key: `Invoice.token` is the public cuid used for `/portal/:token` — never expo
 `GET /api/portal/:token` and `POST /api/portal/:token/mark-paid` are unauthenticated — no `requireAuth` middleware. The client portal page (`/portal/:token` in the web app) must work with zero cookies.
 
 ## Design
-- Accent color: amber (`brand-500` = `#f59e0b`)
-- Dark mode via Tailwind `dark:` classes (class strategy)
-- Font: Inter (loaded from Google Fonts in `index.html`)
-- The Devanagari "हिसाब" appears alongside "Hisab" in logo/header
+- Design brief: `UNSLOP.md`. Tokens in `apps/web/src/index.css` + `tailwind.config.ts`
+- Surfaces: warm graphite neutrals; text roles `foreground` / `muted-foreground` / `faint`
+- Accent: amber (`brand-500` = `#f59e0b`) used sparingly — primary action, selection, one key figure. Amber fills carry dark text (`text-primary-foreground`); amber as text uses `text-brand-ink`
+- Semantic colours: `positive` / `negative` only for meaning (paid, overdue, errors)
+- Status is a dot + label (`StatusBadge`), not a filled pill. The double rule (`.double-rule`, `TotalFigure`) marks only a document's final total
+- Sentence case, weights 400–600, `tabular-nums` on amounts, named transitions (no `transition-all`), one easing curve
+- Dark mode via Tailwind `dark:` classes (class strategy); the client portal always renders light
+- Font: Inter (Google Fonts in `index.html`). PDFs use bundled TTFs registered in `apps/web/src/components/pdf-fonts.ts` (Inter + Noto Sans Devanagari); wrap Devanagari in PDFs with the `devanagari` style
+- The Devanagari "हिसाब" appears alongside "Hisab" in logo/header; favicon in `apps/web/public/`
 
 ## Environment variables
 See `.env.example` at root. Copy to `.env` before running.
@@ -100,13 +114,13 @@ Optional for Week 1: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 |------|-------|
 | 1 ✅ | Monorepo init, Prisma schema + migrations, Better Auth (email + Google), login/signup UI |
 | 2 ✅ | Client CRUD (API + UI), Invoice creation form with live totals, auto invoice numbering |
-| 3 ✅ | Invoice list + status tabs, NPR conversion (exchangerate.host + DB cache), dashboard stats |
+| 3 ✅ | Invoice list + status tabs, NPR conversion (open.er-api.com + DB cache), dashboard stats |
 | 4 ✅ | Client portal (public `/portal/:token`), PDF export, "Mark as Paid" flow |
 | 5 ✅ | Resend email (send invoice, reminder, paid notification), overdue cron job, polish |
 | 6 ✅ | Docker + docker-compose, README, `.env.example`, Vercel + Railway deploy, GitHub launch |
 
 ### Key decisions
-- `packages/ui` — shadcn components installed once, shared across apps (future-proofing)
+- Shared UI components live in `apps/web/src/components/ui/` (a separate `packages/ui` was planned but never created; only one app uses them)
 - `packages/shared` — Zod schemas defined once, imported in both API (validation) and web (form types)
 - `tsx` for running TypeScript in the API during dev
 - `date-fns` for date math (due dates, overdue detection)
@@ -185,6 +199,30 @@ Goal: become the go-to open-source invoicing tool for Nepali freelancers and sma
 - [x] **Expense tracking** — log expenses, attach to projects/clients
 - [x] **Time-based invoicing** — log hours → generate invoice from timesheet
 - [ ] **Multi-user / team roles** — owner, accountant, viewer permissions
+
+---
+
+## UI Redesign & Correctness Fixes ✅
+
+Done 2026-11-09 (PRs #1, #2). Audit and design direction from `UNSLOP.md`; full changelog in `docs/roadmap.md`.
+
+- [x] Design system: tokens, shared `components/ui/`, every screen restyled, mobile layouts for list pages
+- [x] Multi-currency: dashboard and fiscal-year report return per-currency + NPR totals (no mixed sums)
+- [x] Overdue count uses `COUNT(DISTINCT)`; invoice + quote lists filter by `?status=` with `counts`
+- [x] TDS invoices settle at net receivable; partial payments count in collected/outstanding/statement balance
+- [x] Recurring schedules: view/edit page at `/recurring/:id`
+- [x] PDFs: bundled fonts (glyphs were missing), template margins applied
+- [x] Web `tsconfig` has `noEmit` (build used to write `.js` into `src/`)
+- [x] Favicon + apple-touch-icon
+
+### Open follow-ups
+- [ ] Convert historical collections at the rate on the payment date (reports use today's rate)
+- [ ] Portal "Mark as paid" sets PAID without a payment record — consider recording a payment
+- [ ] Show partially-paid state in invoice lists (status stays SENT/OVERDUE)
+- [ ] Hand-polish forms the codemod only restyled: `InvoiceNewPage`, `QuoteNewPage`, `QuoteDetailPage`, expense/time dialogs
+- [ ] Drop the legacy mixed-currency fields (`totalInvoiced`/`totalPaid`/`totalOutstanding`) once no client reads them
+- [ ] Playwright end-to-end tests in CI (Playwright is installed; checks so far were ad hoc)
+- [ ] `pnpm db:seed` with a demo account for local testing
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph

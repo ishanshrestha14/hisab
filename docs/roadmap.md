@@ -12,6 +12,8 @@
 | Week 6 | ✅ | Docker + docker-compose, README, `.env.example`, Railway + Vercel deploy |
 | Portfolio upgrade | ✅ | P1–P4 improvements — see below |
 | Production hardening | ✅ | Security, reliability, observability — see below |
+| Product features | 🟡 | Templates, quotes, recurring, TDS, fiscal reports, IRD format, payments, expenses, time — see below |
+| UI redesign & correctness | ✅ | Design system, multi-currency and TDS fixes, PDF fonts (Nov 2026) — see below |
 
 ---
 
@@ -54,12 +56,59 @@ Done after P4:
 
 ---
 
+## Product features
+
+Built to compete with Zoho Invoice, Invoice Ninja and InvoicePlane for Nepali freelancers.
+
+- [x] PDF invoice templates (classic, modern, minimal, IRD) with logo and accent colour
+- [x] PAN / VAT on profile, PDF and portal
+- [x] Quotes / estimates with one-click conversion to an invoice
+- [x] Recurring invoices on a schedule (weekly, monthly, quarterly, yearly), with view/edit
+- [x] TDS per invoice; invoices settle at the net receivable
+- [x] Nepali fiscal-year reports (Shrawan–Ashad)
+- [x] IRD-compatible invoice format (BS date, amount in words, Devanagari labels)
+- [x] Client statement page and PDF
+- [x] Partial payments and payment history
+- [x] Expense tracking
+- [x] Time tracking → invoice from timesheet
+- [ ] eSewa / Khalti / ConnectIPS payment links on the portal
+- [ ] Multi-user / team roles (owner, accountant, viewer)
+
+---
+
+## UI redesign & correctness fixes ✅
+
+November 2026, PRs #1 and #2. Design brief in [`UNSLOP.md`](../UNSLOP.md).
+
+**Design system**
+- Warm graphite neutrals; amber (`brand-500`) is an accent only and carries dark text for contrast
+- Shared components in `apps/web/src/components/ui/` (button, fields, status, layout, table, modal, money)
+- Status shown as dot + label; the accountant's double rule marks final totals
+- `InvoiceDocument` renders the invoice once for both the detail page and the client portal
+- Responsive portal, statement and list pages; a single theme store shared by every toggle
+- Favicon and touch icon matching the logo mark
+
+**Money correctness**
+- Dashboard and fiscal-year report never add currencies together: per-currency totals plus NPR conversion
+- Overdue count counts invoices, not line items
+- Invoice and quote lists filter by status on the server, with counts across all pages
+- TDS invoices settle at the net receivable (paying the net marks them PAID)
+- Collected / outstanding / statement balance include partial payments, via a shared `settlement()` rule
+- Portal includes the sender's name; API error messages reach the UI instead of `[object Object]`
+
+**PDFs**
+- Bundled Inter and Noto Sans Devanagari TTFs; the previous Google Fonts subsets dropped glyphs
+- Template margins are applied (classic, minimal and IRD printed edge to edge)
+
+---
+
 ## Planned
 
-- [ ] Recurring invoices with configurable frequency
+- [ ] eSewa / Khalti / ConnectIPS payment links on the portal
+- [ ] Multi-user / team roles
 - [ ] Webhook notifications for invoice events (`invoice.created`, `invoice.paid`)
 - [ ] Multi-language support (Nepali / English)
 - [ ] CSV/Excel data export
 - [ ] Background job queue (BullMQ + Redis) for email and cron at scale
-- [ ] Services layer — extract business logic from route handlers into `src/services/`
-- [ ] Test suite — integration tests against a real DB (no mocks)
+- [ ] Services layer — continue extracting route logic into `src/services/` (done: `invoice-calc`, `numbering`, `fiscal-year`, `recurrence`)
+- [ ] Integration tests against a real DB, and Playwright end-to-end tests in CI (unit and route tests exist: 187 with mocked Prisma)
