@@ -1,14 +1,19 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { Link, useParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import { Copy, Check, Download, ArrowLeft, Send, AlertCircle, Plus, Trash2, X } from "lucide-react";
+import { Copy, Check, Download, Send, FileX, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { InvoicePDF, type InvoicePDFProps } from "@/components/InvoicePDF";
+import { InvoiceDocument } from "@/components/InvoiceDocument";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/field";
+import { EmptyState, Modal, Page, PageHeader, Panel, PanelHeader, Skeleton } from "@/components/ui/layout";
+import { Money } from "@/components/ui/money";
 import { createPaymentSchema, type CreatePaymentInput } from "@hisab/shared";
 
 interface Payment {
@@ -30,30 +35,7 @@ interface InvoiceDetail extends InvoicePDFProps {
   payments: Payment[];
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-muted text-muted-foreground",
-  SENT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  PAID: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  OVERDUE: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Draft",
-  SENT: "Sent",
-  PAID: "Paid",
-  OVERDUE: "Overdue",
-};
-
-const inputClass =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand/30 transition-colors duration-150";
-
-function AddPaymentDialog({
-  invoice,
-  onClose,
-}: {
-  invoice: InvoiceDetail;
-  onClose: () => void;
-}) {
+function AddPaymentDialog({ invoice, onClose }: { invoice: InvoiceDetail; onClose: () => void }) {
   const queryClient = useQueryClient();
   const remaining = invoice.amountDue;
 
@@ -69,8 +51,7 @@ function AddPaymentDialog({
   });
 
   const mutation = useMutation({
-    mutationFn: (data: CreatePaymentInput) =>
-      api.post(`/api/invoices/${invoice.id}/payments`, data),
+    mutationFn: (data: CreatePaymentInput) => api.post(`/api/invoices/${invoice.id}/payments`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoice", invoice.id] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -84,98 +65,50 @@ function AddPaymentDialog({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card shadow-xl animate-in-up">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-semibold text-foreground">Record Payment</h2>
-          <button
-            onClick={onClose}
-            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <form
-          onSubmit={handleSubmit((data) => mutation.mutate(data))}
-          className="space-y-4 p-6"
+    <Modal title="Record payment" onClose={onClose}>
+      <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
+        <Field
+          label={`Amount (${invoice.currency})`}
+          htmlFor="pay-amount"
+          error={errors.amount?.message}
+          hint={remaining > 0 ? `Unpaid: ${formatCurrency(remaining, invoice.currency)}` : undefined}
         >
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Amount ({invoice.currency}) *
-            </label>
-            <input
-              {...register("amount", { valueAsNumber: true })}
-              type="number"
-              step="0.01"
-              min="0.01"
-              placeholder={remaining.toFixed(2)}
-              className={errors.amount ? inputClass.replace("border-input", "border-destructive") : inputClass}
-            />
-            {errors.amount && (
-              <p className="mt-1.5 text-xs text-destructive">{errors.amount.message}</p>
-            )}
-            {remaining > 0 && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Amount due: {formatCurrency(remaining, invoice.currency)}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Date
-            </label>
-            <input
-              {...register("paidAt")}
-              type="date"
-              defaultValue={new Date().toISOString().split("T")[0]}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Notes
-            </label>
-            <input
-              {...register("notes")}
-              placeholder="Bank transfer, ref #1234…"
-              className={inputClass}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || mutation.isPending}
-              className="cursor-pointer rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {mutation.isPending ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Saving…
-                </span>
-              ) : (
-                "Record payment"
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <Input
+            id="pay-amount"
+            {...register("amount", { valueAsNumber: true })}
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0.01"
+            placeholder={remaining.toFixed(2)}
+            aria-invalid={!!errors.amount}
+            autoFocus
+          />
+        </Field>
+        <Field label="Date received" htmlFor="pay-date">
+          <Input
+            id="pay-date"
+            {...register("paidAt")}
+            type="date"
+            defaultValue={new Date().toISOString().split("T")[0]}
+          />
+        </Field>
+        <Field label="Notes" htmlFor="pay-notes">
+          <Input id="pay-notes" {...register("notes")} placeholder="Bank transfer, ref #1234" />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" loading={isSubmitting || mutation.isPending}>
+            Record payment
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -223,329 +156,137 @@ export default function InvoiceDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8 space-y-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-12 animate-pulse rounded bg-muted" />
-        ))}
-      </div>
+      <Page>
+        <Skeleton className="mb-8 h-8 w-48" />
+        <Skeleton className="h-[480px] w-full rounded-xl" />
+      </Page>
     );
   }
 
   if (!invoice || !invoice.freelancer) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center p-8">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <AlertCircle size={20} className="text-muted-foreground" />
-        </div>
-        <p className="font-medium text-foreground">Invoice not found</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          This invoice may have been deleted.
-        </p>
-        <button
-          onClick={() => navigate("/invoices")}
-          className="mt-4 cursor-pointer rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
-        >
-          Back to invoices
-        </button>
-      </div>
+      <Page>
+        <EmptyState
+          icon={FileX}
+          title="Invoice not found"
+          description="It may have been deleted, or it belongs to another account"
+          action={
+            <Link to="/invoices" className={buttonVariants()}>
+              Back to invoices
+            </Link>
+          }
+        />
+      </Page>
     );
   }
 
+  const isPaid = invoice.status === "PAID";
+  const isDraft = invoice.status === "DRAFT";
+  const hasTds = invoice.tdsPercent > 0;
+
   return (
-    <div className="p-4 sm:p-8 animate-in-up">
-      {/* Toolbar */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={() => navigate("/invoices")}
-          className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft size={16} />
-          Back to invoices
-        </button>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={copyPortalLink}
-            className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] ${
-              copied
-                ? "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
-                : "border-border text-foreground hover:bg-accent"
-            }`}
-          >
-            {copied ? (
-              <Check size={14} className="text-green-600" />
-            ) : (
-              <Copy size={14} />
-            )}
-            {copied ? "Copied!" : "Copy client link"}
-          </button>
-
-          <PDFDownloadLink
-            document={<InvoicePDF {...invoice} />}
-            fileName={`${invoice.number}.pdf`}
-            className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-all duration-150 hover:bg-accent active:scale-[0.98]"
-          >
-            <Download size={14} />
-            Download PDF
-          </PDFDownloadLink>
-
-          {invoice.status === "DRAFT" && (
-            <button
-              onClick={() => sendInvoice.mutate()}
-              disabled={sendInvoice.isPending}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {sendInvoice.isPending ? (
-                <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Sending…
-                </>
-              ) : (
-                <>
-                  <Send size={13} />
-                  Send to Client
-                </>
-              )}
-            </button>
-          )}
-
-          {invoice.status !== "PAID" && (
-            <button
-              onClick={() => setShowPaymentDialog(true)}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-all hover:bg-green-700 active:scale-[0.98]"
-            >
-              <Plus size={13} />
-              Add Payment
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Invoice card */}
-      <div className="rounded-lg border border-border bg-card">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border px-8 py-6">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Invoice
-            </p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{invoice.number}</p>
-          </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[invoice.status] ?? ""}`}
-          >
-            {STATUS_LABEL[invoice.status] ?? invoice.status}
+    <Page>
+      <PageHeader
+        back={{ to: "/invoices", label: "Invoices" }}
+        title={
+          <span>
+            {invoice.number}
+            <span className="ml-3 text-base font-normal text-faint">{invoice.client.name}</span>
           </span>
-        </div>
-
-        {/* From / To / Dates */}
-        <div className="grid grid-cols-1 gap-6 border-b border-border px-4 py-6 sm:grid-cols-3 sm:px-8">
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              From
-            </p>
-            <p className="font-medium text-foreground">{invoice.freelancer.name}</p>
-            <p className="text-sm text-muted-foreground">{invoice.freelancer.email}</p>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Bill To
-            </p>
-            <p className="font-medium text-foreground">{invoice.client.name}</p>
-            {invoice.client.company && (
-              <p className="text-sm text-muted-foreground">{invoice.client.company}</p>
-            )}
-            <p className="text-sm text-muted-foreground">{invoice.client.email}</p>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Issue Date
-            </p>
-            <p className="text-sm text-foreground">
-              {new Date(invoice.issueDate).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-            <p className="mb-1.5 mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Due Date
-            </p>
-            <p className="text-sm text-foreground">
-              {new Date(invoice.dueDate).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-          </div>
-        </div>
-
-        {/* Line items */}
-        <div className="overflow-x-auto px-4 py-6 sm:px-8">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <th className="pb-3">Description</th>
-                <th className="pb-3 text-right">Qty</th>
-                <th className="pb-3 text-right">Unit Price</th>
-                <th className="pb-3 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoice.lineItems.map((item, i) => (
-                <tr key={i} className="border-b border-border last:border-0">
-                  <td className="py-3 text-foreground">{item.description}</td>
-                  <td className="py-3 text-right text-muted-foreground">
-                    {item.quantity}
-                  </td>
-                  <td className="py-3 text-right text-muted-foreground">
-                    {formatCurrency(item.unitPrice, invoice.currency)}
-                  </td>
-                  <td className="py-3 text-right font-medium text-foreground">
-                    {formatCurrency(item.total, invoice.currency)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="mt-6 flex flex-col items-end gap-1.5">
-            {invoice.tdsPercent > 0 ? (
-              <div className="w-full max-w-[260px] space-y-1.5 text-sm">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Gross</span>
-                  <span>{formatCurrency(invoice.total, invoice.currency)}</span>
-                </div>
-                <div className="flex justify-between text-red-500">
-                  <span>TDS ({invoice.tdsPercent}%)</span>
-                  <span>−{formatCurrency(invoice.tdsAmount, invoice.currency)}</span>
-                </div>
-                <div className="flex justify-between border-t border-border pt-1.5">
-                  <span className="font-semibold text-foreground">Net Receivable</span>
-                  <span className="text-2xl font-bold text-foreground">
-                    {formatCurrency(invoice.netReceivable, invoice.currency)}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-baseline gap-8">
-                <span className="text-sm font-medium text-muted-foreground">Total</span>
-                <span className="text-3xl font-bold text-foreground">
-                  {formatCurrency(invoice.total, invoice.currency)}
-                </span>
-              </div>
-            )}
-            {invoice.nprTotal && invoice.nprRate && (
-              <p className="text-xs text-muted-foreground">
-                ≈{" "}
-                <span className="font-medium text-brand">
-                  {formatCurrency(invoice.nprTotal, "NPR")}
-                </span>{" "}
-                at 1 {invoice.currency} = ₨{invoice.nprRate.toFixed(2)}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {invoice.notes && (
-          <div className="border-t border-border px-4 py-5 sm:px-8">
-            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Notes
-            </p>
-            <p className="text-sm text-foreground">{invoice.notes}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Payments section */}
-      <div className="mt-6 rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div>
-            <h2 className="font-medium text-foreground">Payment History</h2>
-            {invoice.amountDue > 0 && invoice.status !== "PAID" && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {formatCurrency(invoice.amountDue, invoice.currency)} remaining
-              </p>
-            )}
-          </div>
-          {invoice.status !== "PAID" && (
-            <button
-              onClick={() => setShowPaymentDialog(true)}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+        }
+        actions={
+          <>
+            <Button onClick={copyPortalLink} aria-live="polite">
+              {copied ? <Check size={14} className="text-positive" /> : <Copy size={14} />}
+              {copied ? "Link copied" : "Copy client link"}
+            </Button>
+            <PDFDownloadLink
+              document={<InvoicePDF {...invoice} />}
+              fileName={`${invoice.number}.pdf`}
+              className={buttonVariants()}
             >
-              <Plus size={12} />
-              Record payment
-            </button>
-          )}
-        </div>
+              <Download size={14} />
+              PDF
+            </PDFDownloadLink>
+            {/* One primary action, chosen by where the invoice is in its life */}
+            {isDraft ? (
+              <Button variant="primary" onClick={() => sendInvoice.mutate()} loading={sendInvoice.isPending}>
+                {!sendInvoice.isPending && <Send size={14} />}
+                Send to client
+              </Button>
+            ) : (
+              !isPaid && (
+                <Button variant="primary" onClick={() => setShowPaymentDialog(true)}>
+                  <Plus size={16} />
+                  Record payment
+                </Button>
+              )
+            )}
+          </>
+        }
+      />
 
-        {invoice.payments.length === 0 ? (
-          <div className="flex flex-col items-center py-10">
-            <p className="text-sm text-muted-foreground">No payments recorded yet</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Notes</th>
-                <th className="px-6 py-3 text-right">Amount</th>
-                <th className="px-6 py-3" />
-              </tr>
-            </thead>
-            <tbody>
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <InvoiceDocument invoice={invoice} />
+
+        {/* Payments: what's been received against this invoice */}
+        <Panel>
+          <PanelHeader
+            title="Payments"
+            description={isDraft ? "Payments can be recorded once the invoice is sent" : undefined}
+          />
+          <dl className="space-y-2 border-b border-border px-4 py-4 text-sm sm:px-5">
+            <div className="flex justify-between gap-4 text-muted-foreground">
+              <dt>{hasTds ? "Gross amount" : "Invoice total"}</dt>
+              <dd>
+                <Money amount={invoice.total} currency={invoice.currency} />
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 text-muted-foreground">
+              <dt>Received</dt>
+              <dd>
+                <Money amount={invoice.amountPaid} currency={invoice.currency} />
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 border-t border-border pt-2 font-medium text-foreground">
+              <dt>{hasTds ? "Unpaid of gross" : "Unpaid"}</dt>
+              <dd>
+                <Money amount={invoice.amountDue} currency={invoice.currency} />
+              </dd>
+            </div>
+          </dl>
+
+          {invoice.payments.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-faint">No payments recorded yet</p>
+          ) : (
+            <ul className="divide-y divide-border">
               {invoice.payments.map((payment) => (
-                <tr
-                  key={payment.id}
-                  className="border-b border-border last:border-0 transition-colors hover:bg-accent/50"
-                >
-                  <td className="px-6 py-3 text-muted-foreground">
-                    {new Date(payment.paidAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="px-6 py-3 text-muted-foreground">
-                    {payment.notes ?? <span className="text-muted-foreground/50">—</span>}
-                  </td>
-                  <td className="px-6 py-3 text-right font-medium text-green-600 dark:text-green-400">
-                    +{formatCurrency(payment.amount, invoice.currency)}
-                  </td>
-                  <td className="px-6 py-3 text-right">
-                    <button
-                      onClick={() => deletePayment.mutate(payment.id)}
-                      disabled={deletePayment.isPending}
-                      className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-                      aria-label="Remove payment"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
+                <li key={payment.id} className="group flex items-center gap-3 px-4 py-3 sm:px-5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground">
+                      <Money amount={payment.amount} currency={invoice.currency} />
+                    </p>
+                    <p className="truncate text-xs text-faint">
+                      {formatDate(payment.paidAt)}
+                      {payment.notes && ` · ${payment.notes}`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => deletePayment.mutate(payment.id)}
+                    disabled={deletePayment.isPending}
+                    className="cursor-pointer rounded-md p-1.5 text-faint transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                    aria-label={`Remove payment of ${formatCurrency(payment.amount, invoice.currency)}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
               ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border">
-                <td colSpan={2} className="px-6 py-3 text-sm text-muted-foreground">
-                  Total paid
-                </td>
-                <td className="px-6 py-3 text-right font-semibold text-foreground">
-                  {formatCurrency(invoice.amountPaid, invoice.currency)}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
-          </table></div>
-        )}
+            </ul>
+          )}
+        </Panel>
       </div>
 
-      {showPaymentDialog && (
-        <AddPaymentDialog
-          invoice={invoice}
-          onClose={() => setShowPaymentDialog(false)}
-        />
-      )}
-    </div>
+      {showPaymentDialog && <AddPaymentDialog invoice={invoice} onClose={() => setShowPaymentDialog(false)} />}
+    </Page>
   );
 }
