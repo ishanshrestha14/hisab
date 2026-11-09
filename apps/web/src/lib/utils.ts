@@ -20,3 +20,17 @@ export function formatCurrency(amount: number, currency: string): string {
     maximumFractionDigits: 2,
   })}`;
 }
+
+const DATE_STYLES = {
+  // "Nov 9, 2026" — tables, lists, meta
+  short: { month: "short", day: "numeric", year: "numeric" },
+  // "November 9, 2026" — documents (invoice, portal, statement)
+  long: { month: "long", day: "numeric", year: "numeric" },
+  // "November 2026" — period titles
+  month: { month: "long", year: "numeric" },
+} as const satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+/** One date format per context, used everywhere */
+export function formatDate(date: string | Date, style: keyof typeof DATE_STYLES = "short"): string {
+  return new Date(date).toLocaleDateString("en-US", DATE_STYLES[style]);
+}

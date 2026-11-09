@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cn, formatCurrency } from "./utils";
+import { cn, formatCurrency, formatDate } from "./utils";
 
 describe("formatCurrency", () => {
   it.each([
@@ -23,5 +23,25 @@ describe("cn", () => {
 
   it("drops falsy values", () => {
     expect(cn("a", false, null, undefined, "b")).toBe("a b");
+  });
+});
+
+describe("formatDate", () => {
+  const d = new Date(2026, 10, 9);
+
+  it("defaults to the short style used in tables", () => {
+    expect(formatDate(d)).toBe("Nov 9, 2026");
+  });
+
+  it("uses the long style on documents", () => {
+    expect(formatDate(d, "long")).toBe("November 9, 2026");
+  });
+
+  it("formats a period title", () => {
+    expect(formatDate(d, "month")).toBe("November 2026");
+  });
+
+  it("accepts ISO strings from the API", () => {
+    expect(formatDate("2026-11-09T12:00:00.000Z")).toBe("Nov 9, 2026");
   });
 });
