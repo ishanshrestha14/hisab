@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import { CheckCircle, Download, AlertTriangle } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { CheckCircle2, Download, AlertCircle, FileX } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { InvoicePDF, type InvoicePDFProps } from "@/components/InvoicePDF";
+import { InvoiceDocument } from "@/components/InvoiceDocument";
+import { Button, Spinner, buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/layout";
+import { Money } from "@/components/ui/money";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -25,24 +29,37 @@ interface PortalInvoice extends InvoicePDFProps {
   payments: PortalPayment[];
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-muted text-muted-foreground",
-  SENT: "bg-blue-100 text-blue-700",
-  PAID: "bg-green-100 text-green-700",
-  OVERDUE: "bg-red-100 text-red-700",
-};
+// The portal is a document for the client: always shown on light "paper",
+// whatever theme the freelancer last used in this browser.
+function useLightTheme() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const wasDark = root.classList.contains("dark");
+    root.classList.remove("dark");
+    return () => {
+      if (wasDark) root.classList.add("dark");
+    };
+  }, []);
+}
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Draft",
-  SENT: "Sent",
-  PAID: "Paid",
-  OVERDUE: "Overdue",
-};
+function Masthead({ freelancer }: { freelancer?: string }) {
+  return (
+    <div className="mb-6 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-7 w-7 select-none items-center justify-center rounded-lg bg-primary text-[15px] font-semibold text-primary-foreground">
+          ह
+        </div>
+        <span className="text-sm text-muted-foreground">{freelancer ? `Invoice from ${freelancer}` : "Hisab"}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function PortalPage() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   const [paid, setPaid] = useState(false);
+  useLightTheme();
 
   const {
     data: invoice,
@@ -63,10 +80,11 @@ export default function PortalPage() {
         method: "POST",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(
-          (err as { error?: string }).error ?? "Failed to mark as paid"
-        );
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string | { message?: string };
+        };
+        const message = typeof body.error === "string" ? body.error : body.error?.message;
+        throw new Error(message ?? "Couldn't mark this invoice as paid. Try again in a moment.");
       }
       return res.json();
     },
@@ -78,304 +96,128 @@ export default function PortalPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background text-faint">
+        <Spinner className="h-5 w-5" />
       </div>
     );
   }
 
   if (error || !invoice) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
-            <AlertTriangle size={24} className="text-red-600" />
-          </div>
-          <p className="text-lg font-semibold text-slate-900">Invoice not found</p>
-          <p className="mt-1 text-sm text-slate-500">
-            This link may be invalid or expired.
-          </p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <EmptyState
+          icon={FileX}
+          title="Invoice not found"
+          description="This link may be mistyped, or the invoice was withdrawn. Ask the sender for a new link."
+        />
       </div>
     );
   }
 
   const isPaid = paid || invoice.status === "PAID";
+  const hasTds = invoice.tdsPercent > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-12">
-      <div className="mx-auto max-w-2xl">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500 text-white text-2xl font-bold shadow-sm select-none">
-            ह
-          </div>
-          <p className="text-sm font-medium text-slate-400">
-            हिसाब Hisab — Invoice
-          </p>
-        </div>
+    <div className="min-h-screen bg-background px-4 py-8 sm:py-14">
+      <main className="mx-auto max-w-3xl animate-in-up">
+        <Masthead freelancer={invoice.freelancer.name || undefined} />
 
-        {/* Paid success banner */}
         {isPaid && (
-          <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-4 animate-in-up">
-            <CheckCircle size={20} className="shrink-0 text-green-600" />
+          <div
+            role="status"
+            className="mb-4 flex items-start gap-3 rounded-xl border border-positive/25 bg-positive/5 px-4 py-3.5"
+          >
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-positive" />
             <div>
-              <p className="text-sm font-semibold text-green-800">
-                Payment confirmed — thank you!
-              </p>
-              <p className="text-xs text-green-700">
-                The freelancer has been notified.
+              <p className="text-sm font-medium text-foreground">This invoice is paid</p>
+              <p className="text-sm text-muted-foreground">
+                {paid ? "The sender has been notified. Thank you." : "No further payment is needed."}
               </p>
             </div>
           </div>
         )}
 
-        {/* Overdue warning */}
         {invoice.status === "OVERDUE" && !isPaid && (
-          <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-4">
-            <AlertTriangle size={18} className="shrink-0 text-red-600" />
-            <p className="text-sm font-medium text-red-800">
-              This invoice is overdue. Please arrange payment at your earliest convenience.
+          <div
+            role="status"
+            className="mb-4 flex items-start gap-3 rounded-xl border border-negative/25 bg-negative/5 px-4 py-3.5"
+          >
+            <AlertCircle size={18} className="mt-0.5 shrink-0 text-negative" />
+            <p className="text-sm text-foreground">
+              Payment was due on {formatDate(invoice.dueDate, "long")}
             </p>
           </div>
         )}
 
-        {/* Invoice card */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          {/* Invoice header */}
-          <div className="flex items-start justify-between border-b border-slate-100 px-8 py-6">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Invoice
-              </p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">
-                {invoice.number}
-              </p>
-            </div>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[invoice.status] ?? ""}`}
-            >
-              {STATUS_LABEL[invoice.status] ?? invoice.status}
-            </span>
-          </div>
-
-          {/* From / To / Dates */}
-          <div className="grid grid-cols-3 gap-6 border-b border-slate-100 px-8 py-6">
-            <div>
-              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
-                From
-              </p>
-              <p className="font-medium text-slate-900">{invoice.freelancer.name}</p>
-              <p className="text-sm text-slate-500">{invoice.freelancer.email}</p>
-              {invoice.freelancer.pan && (
-                <p className="text-sm text-slate-500">PAN: {invoice.freelancer.pan}</p>
-              )}
-              {invoice.freelancer.vatNumber && (
-                <p className="text-sm text-slate-500">VAT: {invoice.freelancer.vatNumber}</p>
-              )}
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
-                Bill To
-              </p>
-              <p className="font-medium text-slate-900">{invoice.client.name}</p>
-              {invoice.client.company && (
-                <p className="text-sm text-slate-500">{invoice.client.company}</p>
-              )}
-              <p className="text-sm text-slate-500">{invoice.client.email}</p>
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
-                Issue Date
-              </p>
-              <p className="text-sm text-slate-700">
-                {new Date(invoice.issueDate).toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-              <p className="mb-1.5 mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">
-                Due Date
-              </p>
-              <p className="text-sm text-slate-700">
-                {new Date(invoice.dueDate).toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-          </div>
-
-          {/* Line items */}
-          <div className="px-8 py-6">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-400">
-                  <th className="pb-3">Description</th>
-                  <th className="pb-3 text-right">Qty</th>
-                  <th className="pb-3 text-right">Unit Price</th>
-                  <th className="pb-3 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.lineItems.map((item, i) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-0">
-                    <td className="py-3 text-slate-700">{item.description}</td>
-                    <td className="py-3 text-right text-slate-500">{item.quantity}</td>
-                    <td className="py-3 text-right text-slate-500">
-                      {formatCurrency(item.unitPrice, invoice.currency)}
-                    </td>
-                    <td className="py-3 text-right font-medium text-slate-900">
-                      {formatCurrency(item.total, invoice.currency)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Total */}
-            <div className="mt-6 flex flex-col items-end gap-1.5 border-t border-slate-100 pt-5">
-              {invoice.tdsPercent > 0 ? (
-                <div className="w-full max-w-[280px] space-y-1.5 text-sm">
-                  <div className="flex justify-between text-slate-500">
-                    <span>Gross Amount</span>
-                    <span>{formatCurrency(invoice.total, invoice.currency)}</span>
-                  </div>
-                  <div className="flex justify-between text-red-500">
-                    <span>TDS Withheld ({invoice.tdsPercent}%)</span>
-                    <span>−{formatCurrency(invoice.tdsAmount, invoice.currency)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-200 pt-2">
-                    <span className="font-semibold text-slate-700">Net Receivable</span>
-                    <span className="text-2xl font-bold text-slate-900">
-                      {formatCurrency(invoice.netReceivable, invoice.currency)}
-                    </span>
-                  </div>
-                  <p className="pt-1 text-xs text-slate-400">
-                    Client deposits TDS directly with IRD on your behalf.
+        <InvoiceDocument
+          invoice={invoice}
+          footer={
+            <div className="flex flex-col-reverse gap-3 border-t border-border bg-muted/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+              <PDFDownloadLink
+                document={<InvoicePDF {...invoice} />}
+                fileName={`${invoice.number}.pdf`}
+                className={buttonVariants({ size: "lg" })}
+              >
+                <Download size={15} />
+                Download PDF
+              </PDFDownloadLink>
+              {!isPaid && (
+                <div className="flex flex-col gap-1.5 sm:items-end">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={() => markPaid.mutate()}
+                    loading={markPaid.isPending}
+                  >
+                    {markPaid.isPending ? "Confirming" : "Mark as paid"}
+                  </Button>
+                  <p className="text-xs text-faint sm:text-right">
+                    Tells the sender you've paid{" "}
+                    {formatCurrency(hasTds ? invoice.netReceivable : invoice.total, invoice.currency)}
                   </p>
                 </div>
-              ) : (
-                <div className="flex items-baseline gap-8">
-                  <span className="text-sm font-medium text-slate-500">Total Due</span>
-                  <span className="text-3xl font-bold text-slate-900">
-                    {formatCurrency(invoice.total, invoice.currency)}
-                  </span>
-                </div>
-              )}
-              {invoice.nprTotal && invoice.nprRate && (
-                <p className="text-xs text-slate-400">
-                  ≈{" "}
-                  <span className="font-semibold text-amber-600">
-                    {formatCurrency(invoice.nprTotal, "NPR")}
-                  </span>{" "}
-                  at 1 {invoice.currency} = ₨{invoice.nprRate.toFixed(2)}
-                </p>
               )}
             </div>
-          </div>
+          }
+        />
 
-          {/* Notes */}
-          {invoice.notes && (
-            <div className="border-t border-slate-100 px-8 py-5">
-              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
-                Notes
-              </p>
-              <p className="text-sm text-slate-600">{invoice.notes}</p>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-8 py-5">
-            <PDFDownloadLink
-              document={<InvoicePDF {...invoice} />}
-              fileName={`${invoice.number}.pdf`}
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 hover:shadow-sm active:scale-[0.98]"
-            >
-              <Download size={15} />
-              Download PDF
-            </PDFDownloadLink>
-
-            {!isPaid && (
-              <button
-                onClick={() => markPaid.mutate()}
-                disabled={markPaid.isPending}
-                className="cursor-pointer rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-green-700 hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {markPaid.isPending ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Confirming…
-                  </span>
-                ) : (
-                  "Mark as Paid"
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Payment history */}
-        {invoice.payments.length > 0 && (
-          <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-sm font-semibold text-slate-700">Payment History</h2>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-medium uppercase tracking-wide text-slate-400">
-                  <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3">Notes</th>
-                  <th className="px-6 py-3 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.payments.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-6 py-3 text-slate-500">
-                      {new Date(p.paidAt).toLocaleDateString("en-US", {
-                        month: "short", day: "numeric", year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-6 py-3 text-slate-500">{p.notes ?? "—"}</td>
-                    <td className="px-6 py-3 text-right font-medium text-green-600">
-                      +{formatCurrency(p.amount, invoice.currency)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {invoice.amountDue > 0 && (
-                <tfoot>
-                  <tr className="border-t border-slate-100 bg-slate-50/60">
-                    <td colSpan={2} className="px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">
-                      Balance Due
-                    </td>
-                    <td className="px-6 py-3 text-right font-semibold text-slate-900">
-                      {formatCurrency(invoice.amountDue, invoice.currency)}
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        )}
-
-        {/* Error */}
         {markPaid.error && (
-          <div className="mt-3 flex items-center justify-center gap-2 text-sm text-red-600">
-            <AlertTriangle size={14} />
+          <p role="alert" className="mt-3 flex items-center justify-center gap-2 text-sm text-destructive">
+            <AlertCircle size={14} />
             {markPaid.error.message}
-          </div>
+          </p>
         )}
 
-        <p className="mt-8 text-center text-xs text-slate-400">
-          Powered by{" "}
-          <span className="font-semibold text-amber-500">हिसाब Hisab</span> —
-          open-source invoicing for Nepali freelancers
+        {invoice.payments.length > 0 && (
+          <section className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
+            <h2 className="border-b border-border px-5 py-3 text-[15px] font-medium text-foreground sm:px-10">
+              Payments received
+            </h2>
+            <ul className="divide-y divide-border">
+              {invoice.payments.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-4 px-5 py-3 text-sm sm:px-10">
+                  <div className="min-w-0">
+                    <p className="text-foreground">{formatDate(p.paidAt)}</p>
+                    {p.notes && <p className="truncate text-xs text-faint">{p.notes}</p>}
+                  </div>
+                  <Money amount={p.amount} currency={invoice.currency} className="text-foreground" />
+                </li>
+              ))}
+            </ul>
+            {invoice.amountDue > 0 && (
+              <div className="flex justify-between border-t border-border bg-muted/40 px-5 py-3 text-sm font-medium text-foreground sm:px-10">
+                <span>Balance</span>
+                <Money amount={invoice.amountDue} currency={invoice.currency} />
+              </div>
+            )}
+          </section>
+        )}
+
+        <p className="mt-10 text-center text-xs text-faint">
+          Sent with Hisab <span className="text-muted-foreground">हिसाब</span>, open-source invoicing for Nepali
+          freelancers
         </p>
-      </div>
+      </main>
     </div>
   );
 }
