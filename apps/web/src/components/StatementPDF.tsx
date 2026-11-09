@@ -4,23 +4,10 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
 } from "@react-pdf/renderer";
 import { formatCurrency } from "@/lib/utils";
+import "./pdf-fonts"; // registers Inter
 
-Font.register({
-  family: "Inter",
-  fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2",
-      fontWeight: 400,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2ZL7SUc.woff2",
-      fontWeight: 600,
-    },
-  ],
-});
 
 export interface StatementInvoice {
   id: string;
