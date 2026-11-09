@@ -5,24 +5,11 @@ import {
   View,
   Image,
   StyleSheet,
-  Font,
 } from "@react-pdf/renderer";
 import { formatCurrency } from "@/lib/utils";
+import { devanagari } from "./pdf-fonts";
 import { adToBS, formatBS } from "@/lib/bs-date";
 
-Font.register({
-  family: "Inter",
-  fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2",
-      fontWeight: 400,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2ZL7SUc.woff2",
-      fontWeight: 600,
-    },
-  ],
-});
 
 export interface InvoicePDFProps {
   number: string;
@@ -106,7 +93,7 @@ function ClassicTemplate({ number, currency, issueDate, dueDate, notes, total, t
             <Image src={logoUrl} style={classic.logoImg} />
           ) : (
             <>
-              <Text style={[classic.logo, { color: accent }]}>हिसाब Hisab</Text>
+              <Text style={[classic.logo, { color: accent }]}><Text style={devanagari}>हिसाब</Text> Hisab</Text>
               <Text style={classic.logoSub}>Invoicing for Nepali Freelancers</Text>
             </>
           )}
@@ -245,7 +232,7 @@ function ModernTemplate({ number, currency, issueDate, dueDate, notes, total, td
             <Image src={logoUrl} style={modern.logoImg} />
           ) : (
             <>
-              <Text style={modern.logoText}>हिसाब Hisab</Text>
+              <Text style={modern.logoText}><Text style={devanagari}>हिसाब</Text> Hisab</Text>
               <Text style={modern.logoSub}>Invoicing for Nepali Freelancers</Text>
             </>
           )}
@@ -382,7 +369,7 @@ function MinimalTemplate({ number, currency, issueDate, dueDate, notes, total, t
             <Image src={logoUrl} style={minimal.logoImg} />
           ) : (
             <>
-              <Text style={minimal.logoText}>हिसाब Hisab</Text>
+              <Text style={minimal.logoText}><Text style={devanagari}>हिसाब</Text> Hisab</Text>
               <Text style={minimal.logoSub}>Invoicing for Nepali Freelancers</Text>
             </>
           )}
@@ -590,7 +577,7 @@ function IRDTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPe
       <View style={ird.titleBlock}>
         {logoUrl && <Image src={logoUrl} style={{ width: 80, height: 40, objectFit: "contain", marginBottom: 6 }} />}
         <Text style={ird.titleMain}>{docTitle}</Text>
-        <Text style={ird.titleSub}>{docTitleNP}</Text>
+        <Text style={[ird.titleSub, devanagari]}>{docTitleNP}</Text>
       </View>
       <View style={ird.titleRule} />
 
@@ -599,7 +586,7 @@ function IRDTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPe
         {/* Left: supplier + customer */}
         <View style={ird.metaLeft}>
           <View style={ird.metaBox}>
-            <Text style={ird.metaBoxTitle}>Supplier / आपूर्तिकर्ता</Text>
+            <Text style={ird.metaBoxTitle}>Supplier / <Text style={devanagari}>आपूर्तिकर्ता</Text></Text>
             <View style={ird.metaRow}>
               <Text style={ird.metaLabel}>Name:</Text>
               <Text style={ird.metaValue}>{freelancer.name}</Text>
@@ -623,7 +610,7 @@ function IRDTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPe
           </View>
 
           <View style={ird.metaBox}>
-            <Text style={ird.metaBoxTitle}>Customer / ग्राहक</Text>
+            <Text style={ird.metaBoxTitle}>Customer / <Text style={devanagari}>ग्राहक</Text></Text>
             <View style={ird.metaRow}>
               <Text style={ird.metaLabel}>Name:</Text>
               <Text style={ird.metaValue}>{client.name}</Text>
@@ -757,11 +744,21 @@ function IRDTemplate({ number, currency, issueDate, dueDate, notes, total, tdsPe
 
 // ─── Main export ───────────────────────────────────────────────────────────────
 
+// Each template's page margins and base text style. These were defined but
+// never applied, so classic, minimal and IRD printed edge to edge.
+const PAGE_STYLES = {
+  classic: classic.page,
+  modern: modern.page,
+  minimal: minimal.page,
+  ird: ird.page,
+} as const;
+
 export function InvoicePDF(props: InvoicePDFProps) {
   const t = props.template ?? "classic";
+  const pageStyle = PAGE_STYLES[t as keyof typeof PAGE_STYLES] ?? PAGE_STYLES.classic;
   return (
     <Document>
-      <Page size="A4" style={{ fontFamily: "Inter" }}>
+      <Page size="A4" style={pageStyle}>
         {t === "modern" ? (
           <ModernTemplate {...props} />
         ) : t === "minimal" ? (

@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { prisma } from "@hisab/db";
 import { createClientSchema, updateClientSchema } from "@hisab/shared";
 import { apiError } from "../lib/errors";
-import { computeInvoiceTotals } from "../services/invoice-calc";
+import { computeInvoiceTotals, settlement } from "../services/invoice-calc";
 
 // Each route file gets its own Hono instance — mounted at /api/clients in index.ts
 const clients = new Hono<{
@@ -71,25 +71,33 @@ clients.get("/:id/statement", async (c) => {
 
   const invoices = await prisma.invoice.findMany({
     where: { clientId: id, userId: user.id },
-    include: { lineItems: true },
+    include: { lineItems: true, payments: { select: { amount: true } } },
     orderBy: { issueDate: "asc" },
   });
 
-  const invoicesWithTotals = invoices.map((inv) => {
-    const { total, tdsAmount, netReceivable } = computeInvoiceTotals(inv);
-    return { ...inv, total, tdsAmount, netReceivable };
+  // Balance is the net receivable minus payments, the same rule as the
+  // invoice page, dashboard and report. Raw payment rows are not returned.
+  const invoicesWithTotals = invoices.map(({ payments, ...inv }) => {
+    const totals = computeInvoiceTotals({ ...inv, payments });
+    const { collected, balance } = settlement(inv.status, totals);
+    return {
+      ...inv,
+      total: totals.total,
+      tdsAmount: totals.tdsAmount,
+      netReceivable: totals.netReceivable,
+      amountPaid: totals.amountPaid,
+      collected,
+      balance,
+    };
   });
 
   const summary = invoicesWithTotals.reduce(
     (acc, inv) => {
       acc.invoiceCount++;
       acc.totalInvoiced += inv.total;
-      if (inv.status === "PAID") {
-        acc.totalPaid += inv.total;
-        acc.paidCount++;
-      } else if (inv.status === "SENT" || inv.status === "OVERDUE") {
-        acc.totalOutstanding += inv.total;
-      }
+      acc.totalPaid += inv.collected;
+      acc.totalOutstanding += inv.balance;
+      if (inv.status === "PAID") acc.paidCount++;
       return acc;
     },
     { totalInvoiced: 0, totalPaid: 0, totalOutstanding: 0, invoiceCount: 0, paidCount: 0 }
