@@ -26,8 +26,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (isPending) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" />
+      <div className="flex h-screen items-center justify-center text-faint" aria-label="Loading">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       </div>
     );
   }

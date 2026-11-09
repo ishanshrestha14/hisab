@@ -12,8 +12,8 @@ import {
   Sun,
   Moon,
   Settings,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
   Menu,
   X,
 } from "lucide-react";
@@ -22,17 +22,48 @@ import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-const navItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/clients", icon: Users, label: "Clients" },
-  { to: "/invoices", icon: FileText, label: "Invoices" },
-  { to: "/quotes", icon: ClipboardList, label: "Quotes" },
-  { to: "/recurring", icon: RefreshCw, label: "Recurring" },
-  { to: "/time", icon: Clock, label: "Time" },
-  { to: "/expenses", icon: Receipt, label: "Expenses" },
-  { to: "/reports", icon: BarChart2, label: "Reports" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+type NavItem = { to: string; icon: typeof LayoutDashboard; label: string };
+
+const navGroups: { label?: string; items: NavItem[] }[] = [
+  { items: [{ to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" }] },
+  {
+    label: "Billing",
+    items: [
+      { to: "/invoices", icon: FileText, label: "Invoices" },
+      { to: "/quotes", icon: ClipboardList, label: "Quotes" },
+      { to: "/recurring", icon: RefreshCw, label: "Recurring" },
+    ],
+  },
+  {
+    label: "Work",
+    items: [
+      { to: "/clients", icon: Users, label: "Clients" },
+      { to: "/time", icon: Clock, label: "Time" },
+      { to: "/expenses", icon: Receipt, label: "Expenses" },
+    ],
+  },
+  { label: "Books", items: [{ to: "/reports", icon: BarChart2, label: "Reports" }] },
 ];
+
+const settingsItem: NavItem = { to: "/settings", icon: Settings, label: "Settings" };
+
+/** Flat mark: the Devanagari initial in ink on the brand amber */
+function LogoMark() {
+  return (
+    <div className="flex h-7 w-7 shrink-0 select-none items-center justify-center rounded-lg bg-primary text-[15px] font-semibold leading-none text-primary-foreground">
+      ह
+    </div>
+  );
+}
+
+function Wordmark() {
+  return (
+    <div className="flex items-baseline gap-1.5 overflow-hidden whitespace-nowrap">
+      <span className="text-[15px] font-semibold text-foreground">Hisab</span>
+      <span className="text-[13px] text-faint">हिसाब</span>
+    </div>
+  );
+}
 
 function UserAvatar({ name }: { name: string }) {
   const initials = name
@@ -42,19 +73,45 @@ function UserAvatar({ name }: { name: string }) {
     .join("")
     .toUpperCase();
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/20 text-xs font-semibold text-brand">
+    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
       {initials}
     </div>
   );
 }
 
-function NavContent({
-  collapsed,
-  onNavClick,
-}: {
-  collapsed?: boolean;
-  onNavClick?: () => void;
-}) {
+const rowClass = (collapsed?: boolean) =>
+  cn(
+    "flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-sm transition-colors",
+    collapsed && "justify-center px-0"
+  );
+
+function NavRow({ item, collapsed, onNavClick }: { item: NavItem; collapsed?: boolean; onNavClick?: () => void }) {
+  const { to, icon: Icon, label } = item;
+  return (
+    <NavLink
+      to={to}
+      title={collapsed ? label : undefined}
+      onClick={onNavClick}
+      className={({ isActive }) =>
+        cn(
+          rowClass(collapsed),
+          isActive
+            ? "bg-muted font-medium text-foreground"
+            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <Icon size={16} strokeWidth={1.75} className={cn("shrink-0", isActive && "text-brand-ink")} />
+          {!collapsed && <span className="truncate">{label}</span>}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+function NavContent({ collapsed, onNavClick }: { collapsed?: boolean; onNavClick?: () => void }) {
   const { data: session } = useSession();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
@@ -64,100 +121,81 @@ function NavContent({
     navigate("/login");
   }
 
+  const name = session?.user.name || session?.user.email || "U";
+
   return (
     <>
-      {/* Nav items */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            title={collapsed ? label : undefined}
-            onClick={onNavClick}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150",
-                collapsed ? "justify-center px-0 py-2.5" : "",
-                isActive
-                  ? "bg-brand/10 text-brand"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon size={16} className={cn("shrink-0", isActive ? "text-brand" : "")} />
-                {!collapsed && <span className="truncate">{label}</span>}
-              </>
-            )}
-          </NavLink>
+      <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Main">
+        {navGroups.map((group, i) => (
+          <div key={group.label ?? i} className={cn(i > 0 && "mt-5")}>
+            {group.label &&
+              (collapsed ? (
+                <div className="mx-auto mb-2 h-px w-5 bg-border" aria-hidden="true" />
+              ) : (
+                <p className="mb-1 px-2.5 text-xs text-faint">{group.label}</p>
+              ))}
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <NavRow key={item.to} item={item} collapsed={collapsed} onNavClick={onNavClick} />
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
-      {/* Bottom section */}
-      <div className="border-t border-border p-2 space-y-0.5">
-        {/* Dark mode toggle */}
+      <div className="space-y-0.5 border-t border-border px-3 py-3">
+        <NavRow item={settingsItem} collapsed={collapsed} onNavClick={onNavClick} />
         <button
           onClick={toggle}
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          className={cn(
-            "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            collapsed ? "justify-center px-0 py-2.5" : ""
-          )}
-          aria-label="Toggle dark mode"
+          title={collapsed ? (theme === "dark" ? "Light mode" : "Dark mode") : undefined}
+          className={cn(rowClass(collapsed), "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         >
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          {!collapsed && (
-            <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
-          )}
+          {theme === "dark" ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
+          {!collapsed && <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>}
         </button>
 
-        {/* User info — expanded */}
-        {!collapsed && session?.user && (
-          <div className="flex items-center gap-2.5 rounded-md px-3 py-2">
-            <UserAvatar name={session.user.name ?? session.user.email ?? "U"} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-foreground">
-                {session.user.name}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {session.user.email}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* User avatar — collapsed */}
-        {collapsed && session?.user && (
+        {session?.user && (
           <div
-            className="flex justify-center py-1"
-            title={session.user.name ?? session.user.email ?? ""}
+            className={cn("mt-2 flex items-center gap-2.5 px-2.5 py-1.5", collapsed && "justify-center px-0")}
+            title={collapsed ? `${session.user.name} · ${session.user.email}` : undefined}
           >
-            <UserAvatar name={session.user.name ?? session.user.email ?? "U"} />
+            <UserAvatar name={name} />
+            {!collapsed && (
+              <>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-foreground">{session.user.name}</p>
+                  <p className="truncate text-xs text-faint">{session.user.email}</p>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="shrink-0 cursor-pointer rounded-md p-1.5 text-faint transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut size={15} strokeWidth={1.75} />
+                </button>
+              </>
+            )}
           </div>
         )}
-
-        {/* Sign out */}
-        <button
-          onClick={handleSignOut}
-          title={collapsed ? "Sign out" : undefined}
-          className={cn(
-            "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive",
-            collapsed ? "justify-center px-0 py-2.5" : ""
-          )}
-        >
-          <LogOut size={16} />
-          {!collapsed && <span>Sign out</span>}
-        </button>
+        {collapsed && (
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            aria-label="Sign out"
+            className={cn(rowClass(true), "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}
+          >
+            <LogOut size={16} strokeWidth={1.75} />
+          </button>
+        )}
       </div>
     </>
   );
 }
 
 export default function AppLayout() {
-  const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem("hisab-sidebar") === "collapsed";
-  });
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("hisab-sidebar") === "collapsed");
   const [mobileOpen, setMobileOpen] = useState(false);
 
   function toggleSidebar() {
@@ -168,112 +206,102 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* ── Mobile top header ─────────────────────────────────────────── */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white font-bold text-sm select-none">
-            ह
-          </div>
-          <span className="font-semibold text-foreground">Hisab</span>
-          <span className="text-xs text-muted-foreground">हिसाब</span>
+      {/* Mobile top bar */}
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur md:hidden">
+        <div className="flex items-center gap-2.5">
+          <LogoMark />
+          <Wordmark />
         </div>
         <button
           onClick={() => setMobileOpen(true)}
-          className="cursor-pointer rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="-mr-2 cursor-pointer rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Open menu"
+          aria-expanded={mobileOpen}
         >
-          <Menu size={20} />
+          <Menu size={20} strokeWidth={1.75} />
         </button>
       </header>
 
-      {/* ── Mobile drawer overlay ──────────────────────────────────────── */}
+      {/* Mobile drawer */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 animate-fade-in md:hidden"
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"
         />
       )}
-
-      {/* ── Mobile drawer ─────────────────────────────────────────────── */}
       <aside
         className={cn(
-          "fixed left-0 top-0 bottom-0 z-50 flex w-72 flex-col border-r border-border bg-card transition-transform duration-200 ease-in-out md:hidden",
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card transition-transform duration-300 md:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
+        aria-hidden={!mobileOpen}
       >
-        {/* Drawer header */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white font-bold text-sm select-none">
-              ह
-            </div>
-            <div className="leading-tight">
-              <span className="font-semibold text-foreground">Hisab</span>
-              <span className="ml-1.5 text-xs text-muted-foreground">हिसाब</span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <LogoMark />
+            <Wordmark />
           </div>
           <button
             onClick={() => setMobileOpen(false)}
-            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="-mr-1.5 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Close menu"
           >
             <X size={18} />
           </button>
         </div>
-
         <NavContent onNavClick={() => setMobileOpen(false)} />
       </aside>
 
-      {/* ── Desktop sidebar ────────────────────────────────────────────── */}
+      {/* Desktop sidebar */}
       <aside
         className={cn(
-          "relative hidden md:flex flex-col border-r border-border bg-card transition-all duration-200 ease-in-out",
-          collapsed ? "w-14" : "w-60"
+          "hidden shrink-0 flex-col border-r border-border bg-card md:flex",
+          collapsed ? "w-16" : "w-60"
         )}
       >
-        {/* Logo */}
         <div
           className={cn(
-            "flex h-14 shrink-0 items-center border-b border-border transition-all duration-200",
-            collapsed ? "justify-center px-0" : "gap-3 px-5"
+            "flex h-14 shrink-0 items-center border-b border-border",
+            collapsed ? "justify-center" : "justify-between pl-5 pr-3"
           )}
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white font-bold text-sm select-none">
-            ह
-          </div>
-          {!collapsed && (
-            <div className="leading-tight overflow-hidden">
-              <span className="font-semibold text-foreground">Hisab</span>
-              <span className="ml-1.5 text-xs text-muted-foreground">हिसाब</span>
-            </div>
+          {collapsed ? (
+            <button
+              onClick={toggleSidebar}
+              className="group relative cursor-pointer rounded-lg"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <span className="group-hover:invisible">
+                <LogoMark />
+              </span>
+              <PanelLeftOpen
+                size={16}
+                strokeWidth={1.75}
+                className="invisible absolute inset-0 m-auto text-muted-foreground group-hover:visible"
+              />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2.5">
+                <LogoMark />
+                <Wordmark />
+              </div>
+              <button
+                onClick={toggleSidebar}
+                className="cursor-pointer rounded-md p-1.5 text-faint transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose size={16} strokeWidth={1.75} />
+              </button>
+            </>
           )}
         </div>
-
         <NavContent collapsed={collapsed} />
-
-        {/* Collapse toggle */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-border p-2">
-          <button
-            onClick={toggleSidebar}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn(
-              "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-              collapsed ? "justify-center px-0 py-2.5" : ""
-            )}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? <ChevronRight size={16} /> : (
-              <>
-                <ChevronLeft size={16} />
-                <span>Collapse</span>
-              </>
-            )}
-          </button>
-        </div>
       </aside>
 
-      {/* ── Main content ───────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         <Outlet />
       </main>
