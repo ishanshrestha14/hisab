@@ -108,7 +108,16 @@ describe("GET /api/portal/:token", () => {
     expect(body).not.toHaveProperty("id");
     expect(body).not.toHaveProperty("userId");
     expect(body).not.toHaveProperty("token");
-    expect(Object.keys(body.freelancer).sort()).toEqual(["email", "pan", "vatNumber"]);
+    // Only what is printed on the invoice itself
+    expect(Object.keys(body.freelancer).sort()).toEqual(["email", "name", "pan", "vatNumber"]);
+  });
+
+  it("includes the sender's name, which the invoice and PDF print", async () => {
+    db.invoice.findUnique.mockResolvedValue(invoiceRow());
+
+    const body = (await (await request("/tok_public")).json()) as { freelancer: { name: string } };
+
+    expect(body.freelancer.name).toBe("Sita");
   });
 
   it("still renders when the exchange-rate API is down", async () => {

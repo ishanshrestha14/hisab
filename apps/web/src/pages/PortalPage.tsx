@@ -131,7 +131,9 @@ export default function PortalPage() {
             <div>
               <p className="text-sm font-medium text-foreground">This invoice is paid</p>
               <p className="text-sm text-muted-foreground">
-                {paid ? "The sender has been notified. Thank you." : "No further payment is needed."}
+                {paid
+                  ? `${invoice.freelancer.name || "The sender"} has been notified. Thank you.`
+                  : "No further payment is needed."}
               </p>
             </div>
           </div>
@@ -172,7 +174,7 @@ export default function PortalPage() {
                     {markPaid.isPending ? "Confirming" : "Mark as paid"}
                   </Button>
                   <p className="text-xs text-faint sm:text-right">
-                    Tells the sender you've paid{" "}
+                    Tells {invoice.freelancer.name || "the sender"} you've paid{" "}
                     {formatCurrency(hasTds ? invoice.netReceivable : invoice.total, invoice.currency)}
                   </p>
                 </div>
