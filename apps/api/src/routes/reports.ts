@@ -63,39 +63,69 @@ reports.get("/fiscal-year", async (c) => {
         AND i."issueDate" <= ${end}
     `,
 
-    // Breakdown by currency
+    // Breakdown by currency, computed per invoice so partial payments count.
+    // Collected = net receivable once PAID, otherwise payments received.
     prisma.$queryRaw<CurrencyRow[]>`
+      WITH inv AS (
+        SELECT
+          i.currency,
+          i.status,
+          (SELECT COALESCE(SUM(li.total), 0) FROM "LineItem" li WHERE li."invoiceId" = i.id) AS gross,
+          (SELECT COALESCE(SUM(p.amount), 0) FROM "Payment"  p  WHERE p."invoiceId"  = i.id) AS paid,
+          i."tdsPercent" / 100.0 AS tds
+        FROM "Invoice" i
+        WHERE i."userId"    = ${user.id}
+          AND i."issueDate" >= ${start}
+          AND i."issueDate" <= ${end}
+      )
       SELECT
-        i.currency,
-        SUM(li.total) FILTER (WHERE i.status IN ('DRAFT','SENT','PAID','OVERDUE')) AS "totalInvoiced",
-        SUM(li.total) FILTER (WHERE i.status = 'PAID')                             AS "totalPaid",
-        SUM(li.total) FILTER (WHERE i.status IN ('SENT','OVERDUE'))                AS "totalOutstanding",
-        SUM(li.total * i."tdsPercent" / 100.0) FILTER (WHERE i.status = 'PAID')    AS "tdsWithheld"
-      FROM "Invoice" i
-      JOIN "LineItem" li ON li."invoiceId" = i.id
-      WHERE i."userId"    = ${user.id}
-        AND i."issueDate" >= ${start}
-        AND i."issueDate" <= ${end}
-      GROUP BY i.currency
+        currency,
+        SUM(gross) AS "totalInvoiced",
+        SUM(CASE
+              WHEN status = 'PAID'               THEN gross * (1 - tds)
+              WHEN status IN ('SENT','OVERDUE') THEN LEAST(paid, gross * (1 - tds))
+              ELSE 0
+            END) AS "totalPaid",
+        SUM(CASE
+              WHEN status IN ('SENT','OVERDUE') THEN GREATEST(gross * (1 - tds) - paid, 0)
+              ELSE 0
+            END) AS "totalOutstanding",
+        SUM(CASE WHEN status = 'PAID' THEN gross * tds ELSE 0 END) AS "tdsWithheld"
+      FROM inv
+      GROUP BY currency
       ORDER BY "totalInvoiced" DESC NULLS LAST
     `,
 
     // Breakdown by client and currency; combined per client in NPR below
     prisma.$queryRaw<ClientRow[]>`
+      WITH inv AS (
+        SELECT
+          i.id,
+          i."clientId",
+          i.currency,
+          i.status,
+          (SELECT COALESCE(SUM(li.total), 0) FROM "LineItem" li WHERE li."invoiceId" = i.id) AS gross,
+          (SELECT COALESCE(SUM(p.amount), 0) FROM "Payment"  p  WHERE p."invoiceId"  = i.id) AS paid,
+          i."tdsPercent" / 100.0 AS tds
+        FROM "Invoice" i
+        WHERE i."userId"    = ${user.id}
+          AND i."issueDate" >= ${start}
+          AND i."issueDate" <= ${end}
+      )
       SELECT
-        i."clientId",
-        c.name                                                                         AS "clientName",
-        i.currency,
-        SUM(li.total) FILTER (WHERE i.status IN ('DRAFT','SENT','PAID','OVERDUE'))     AS "totalInvoiced",
-        SUM(li.total) FILTER (WHERE i.status = 'PAID')                                AS "totalPaid",
-        COUNT(DISTINCT i.id)                                                           AS "invoiceCount"
-      FROM "Invoice" i
-      JOIN "LineItem" li ON li."invoiceId" = i.id
-      JOIN "Client"   c  ON c.id = i."clientId"
-      WHERE i."userId"    = ${user.id}
-        AND i."issueDate" >= ${start}
-        AND i."issueDate" <= ${end}
-      GROUP BY i."clientId", c.name, i.currency
+        inv."clientId",
+        c.name AS "clientName",
+        inv.currency,
+        SUM(gross) AS "totalInvoiced",
+        SUM(CASE
+              WHEN status = 'PAID'               THEN gross * (1 - tds)
+              WHEN status IN ('SENT','OVERDUE') THEN LEAST(paid, gross * (1 - tds))
+              ELSE 0
+            END) AS "totalPaid",
+        COUNT(*) AS "invoiceCount"
+      FROM inv
+      JOIN "Client" c ON c.id = inv."clientId"
+      GROUP BY inv."clientId", c.name, inv.currency
     `,
 
     // All fiscal years that have at least one invoice for this user

@@ -66,6 +66,17 @@ describe("GET /stats", () => {
     expect(sql.join("?")).toContain("COUNT(DISTINCT i.id)");
   });
 
+  it("counts partial payments and settles TDS invoices at the net", async () => {
+    stubQueries(0, []);
+
+    await app.request("/stats");
+
+    const [sql] = db.$queryRaw.mock.calls[1] as [TemplateStringsArray];
+    const text = sql.join("?");
+    expect(text).toContain('FROM "Payment"');
+    expect(text).toContain("gross * (1 - tds)");
+  });
+
   it("keeps the legacy totals for older clients", async () => {
     stubQueries(3, []);
 

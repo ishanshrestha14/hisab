@@ -23,6 +23,7 @@ type CurrencyRow = {
 // GET /api/dashboard/stats
 //
 // Amounts in different currencies are never added together directly.
+// Collected and outstanding are net of TDS and include partial payments.
 // `byCurrency` holds per-currency totals; the `*NPR` fields convert each
 // currency at today's rate and sum them. The top-level `totalInvoiced` /
 // `totalPaid` / `totalOutstanding` mix currencies and are kept only so older
@@ -44,17 +45,34 @@ dashboard.get("/stats", async (c) => {
       JOIN "LineItem" li ON li."invoiceId" = i.id
       WHERE i."userId" = ${user.id}
     `,
-    // Same totals, grouped by currency
+    // Per-currency totals, computed per invoice so partial payments count.
+    // Collected is money received: the net receivable once PAID, otherwise
+    // the payments recorded so far. Outstanding is what is still owed.
     prisma.$queryRaw<CurrencyRow[]>`
+      WITH inv AS (
+        SELECT
+          i.currency,
+          i.status,
+          (SELECT COALESCE(SUM(li.total), 0) FROM "LineItem" li WHERE li."invoiceId" = i.id) AS gross,
+          (SELECT COALESCE(SUM(p.amount), 0) FROM "Payment"  p  WHERE p."invoiceId"  = i.id) AS paid,
+          i."tdsPercent" / 100.0 AS tds
+        FROM "Invoice" i
+        WHERE i."userId" = ${user.id}
+      )
       SELECT
-        i.currency,
-        SUM(li.total)                                                 AS invoiced,
-        SUM(li.total) FILTER (WHERE i.status = 'PAID')                AS collected,
-        SUM(li.total) FILTER (WHERE i.status IN ('SENT', 'OVERDUE'))  AS outstanding
-      FROM "Invoice" i
-      JOIN "LineItem" li ON li."invoiceId" = i.id
-      WHERE i."userId" = ${user.id}
-      GROUP BY i.currency
+        currency,
+        SUM(gross) AS invoiced,
+        SUM(CASE
+              WHEN status = 'PAID'                THEN gross * (1 - tds)
+              WHEN status IN ('SENT', 'OVERDUE') THEN LEAST(paid, gross * (1 - tds))
+              ELSE 0
+            END) AS collected,
+        SUM(CASE
+              WHEN status IN ('SENT', 'OVERDUE') THEN GREATEST(gross * (1 - tds) - paid, 0)
+              ELSE 0
+            END) AS outstanding
+      FROM inv
+      GROUP BY currency
       ORDER BY invoiced DESC
     `,
     // Only the 5 most recent invoices for the activity list
