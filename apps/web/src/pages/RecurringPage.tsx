@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Plus, RefreshCw, Pause, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -24,6 +24,7 @@ const INTERVAL_LABEL: Record<string, string> = {
 };
 
 export default function RecurringPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<RecurringInvoice[]>({
@@ -109,10 +110,13 @@ export default function RecurringPage() {
                 return (
                   <tr
                     key={ri.id}
-                    className="border-b border-border last:border-0 transition-colors hover:bg-muted/50"
+                    onClick={() => navigate(`/recurring/${ri.id}`)}
+                    className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/50"
                   >
                     <td className="px-4 py-3 text-foreground sm:px-6">
-                      {ri.client.name}
+                      <Link to={`/recurring/${ri.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                        {ri.client.name}
+                      </Link>
                       <span className="mt-0.5 block text-xs text-faint sm:hidden">
                         {INTERVAL_LABEL[ri.interval]} · next {formatDate(ri.nextRunAt)} · {ri.active ? "Active" : "Paused"}
                       </span>
@@ -126,7 +130,7 @@ export default function RecurringPage() {
                       <StatusBadge status={ri.active ? "ACTIVE" : "PAUSED"} />
                     </td>
                     <td className="px-2 py-3 sm:px-6">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => toggleActive.mutate({ id: ri.id, active: !ri.active })}
                           title={ri.active ? "Pause" : "Resume"}

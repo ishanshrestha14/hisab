@@ -11,7 +11,7 @@ import QuotesPage from "./pages/QuotesPage";
 import QuoteNewPage from "./pages/QuoteNewPage";
 import QuoteDetailPage from "./pages/QuoteDetailPage";
 import RecurringPage from "./pages/RecurringPage";
-import RecurringNewPage from "./pages/RecurringNewPage";
+import RecurringFormPage from "./pages/RecurringFormPage";
 import ExpensesPage from "./pages/ExpensesPage";
 import TimePage from "./pages/TimePage";
 import ReportsPage from "./pages/ReportsPage";
@@ -67,7 +67,8 @@ export default function App() {
         <Route path="quotes/new" element={<QuoteNewPage />} />
         <Route path="quotes/:id" element={<QuoteDetailPage />} />
         <Route path="recurring" element={<RecurringPage />} />
-        <Route path="recurring/new" element={<RecurringNewPage />} />
+        <Route path="recurring/new" element={<RecurringFormPage />} />
+        <Route path="recurring/:id" element={<RecurringFormPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="time" element={<TimePage />} />
         <Route path="reports" element={<ReportsPage />} />
