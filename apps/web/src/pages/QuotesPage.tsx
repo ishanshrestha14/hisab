@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router";
-import { Plus, ChevronLeft, ChevronRight, ClipboardList } from "lucide-react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { Plus, ClipboardList } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status";
+import { Pager } from "@/components/ui/table";
 
 interface Quote {
   id: string;
@@ -42,21 +42,41 @@ const STATUS_LABEL: Record<string, string> = {
   CONVERTED: "Converted",
 };
 
+const isTab = (v: string | null): v is FilterTab => TABS.some((t) => t.value === v);
+
 export default function QuotesPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
-  const [page, setPage] = useState(1);
+  // Filter and page live in the URL; filtering happens on the server
+  const [params, setParams] = useSearchParams();
+  const statusParam = params.get("status");
+  const activeTab: FilterTab = isTab(statusParam) ? statusParam : "ALL";
+  const page = Math.max(1, Number(params.get("page")) || 1);
 
-  const { data, isLoading } = useQuery<{ data: Quote[]; pagination: Pagination }>({
-    queryKey: ["quotes", page],
-    queryFn: () => api.get(`/api/quotes?page=${page}&limit=20`),
+  function update(next: { status?: FilterTab; page?: number }) {
+    const status = next.status ?? activeTab;
+    const p = next.page ?? 1;
+    const search = new URLSearchParams();
+    if (status !== "ALL") search.set("status", status);
+    if (p > 1) search.set("page", String(p));
+    setParams(search, { replace: true });
+  }
+
+  const query = new URLSearchParams({ page: String(page), limit: "20" });
+  if (activeTab !== "ALL") query.set("status", activeTab);
+
+  const { data, isLoading } = useQuery<{
+    data: Quote[];
+    pagination: Pagination;
+    counts?: Record<FilterTab, number>;
+  }>({
+    queryKey: ["quotes", activeTab, page],
+    queryFn: () => api.get(`/api/quotes?${query}`),
+    placeholderData: keepPreviousData,
   });
 
-  const quotes = data?.data ?? [];
+  const filtered = data?.data ?? [];
   const pagination = data?.pagination;
-
-  const filtered =
-    activeTab === "ALL" ? quotes : quotes.filter((q) => q.status === activeTab);
+  const counts = data?.counts;
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-8 sm:py-8 animate-in-up">
@@ -82,28 +102,33 @@ export default function QuotesPage() {
         <select
           className="sm:hidden rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/30"
           value={activeTab}
-          onChange={(e) => { setActiveTab(e.target.value as FilterTab); setPage(1); }}
+          onChange={(e) => update({ status: e.target.value as FilterTab })}
+          aria-label="Status"
         >
           {TABS.map((tab) => (
-            <option key={tab.value} value={tab.value}>{tab.label}</option>
+            <option key={tab.value} value={tab.value}>
+              {tab.label}
+              {counts ? ` (${counts[tab.value]})` : ""}
+            </option>
           ))}
         </select>
-        <div className="hidden gap-1 border-b border-border sm:flex">
+        <div role="tablist" aria-label="Filter by status" className="hidden gap-1 border-b border-border sm:flex">
           {TABS.map((tab) => {
-            const count =
-              tab.value === "ALL"
-                ? (pagination?.total ?? quotes.length)
-                : quotes.filter((q) => q.status === tab.value).length;
+            const count = counts?.[tab.value];
             return (
               <button
                 key={tab.value}
-                onClick={() => { setActiveTab(tab.value); setPage(1); }}
+                role="tab"
+                aria-selected={activeTab === tab.value}
+                onClick={() => update({ status: tab.value })}
                 className={`-mb-px flex h-10 cursor-pointer items-center gap-2 border-b-2 px-3 text-sm transition-colors ${ activeTab === tab.value ? "border-brand font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground" }`}
               >
                 {tab.label}
-                <span className={`text-xs tabular-nums ${ activeTab === tab.value ? "text-muted-foreground" : "text-faint" }`}>
-                  {count}
-                </span>
+                {count !== undefined && (
+                  <span className={`text-xs tabular-nums ${ activeTab === tab.value ? "text-muted-foreground" : "text-faint" }`}>
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -200,30 +225,14 @@ export default function QuotesPage() {
         )}
       </div>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Showing {(page - 1) * pagination.limit + 1}–
-            {Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => p - 1)}
-              disabled={page === 1}
-              className="cursor-pointer rounded-lg border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="px-1">Page {page} of {pagination.totalPages}</span>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page === pagination.totalPages}
-              className="cursor-pointer rounded-lg border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+      {pagination && (
+        <Pager
+          page={page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          limit={pagination.limit}
+          onPage={(p) => update({ page: p })}
+        />
       )}
     </div>
   );
