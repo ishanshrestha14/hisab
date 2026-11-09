@@ -11,7 +11,9 @@ packages/db/prisma/migrations/*.lock
 # OS
 .DS_Store
 
-.claude/
+# Claude Code: share project skills, keep local settings private
+.claude/*
+!.claude/skills/
 .mcp.json
 CLAUDE.md
 
