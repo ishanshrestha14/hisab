@@ -2,53 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Hisab design tokens
+ *
+ * Surfaces are a graphite ramp tinted very slightly warm so they sit with the
+ * amber brand without reading as a colour. Amber is the accent only: the
+ * primary action, the current selection, focus, and the one figure that
+ * matters. Text has three roles: foreground, muted-foreground (secondary) and
+ * faint (meta and captions).
+ */
 @layer base {
   :root {
     --radius: 0.5rem;
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 38 92% 50%;
+
+    --background: 60 9% 98%;          /* #fafaf9 */
+    --foreground: 40 6% 10%;          /* #1c1b19 */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 40 6% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 38 92% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --popover-foreground: 40 6% 10%;
+
+    --muted: 60 7% 95%;               /* raised: active rows, inputs, hover */
+    --muted-foreground: 25 5% 32%;    /* secondary text #57534e */
+    --faint: 25 5% 45%;               /* meta and captions #78716c */
+    --accent: 60 7% 95%;
+    --accent-foreground: 40 6% 10%;
+    --secondary: 60 7% 95%;
+    --secondary-foreground: 40 6% 10%;
+
+    --border: 40 6% 90%;              /* hairline */
+    --input: 40 5% 84%;
+
+    --primary: 38 92% 50%;            /* amber-500, carries dark text */
+    --primary-foreground: 40 6% 10%;
+    --brand-ink: 26 90% 37%;          /* amber-700, amber used as text */
+    --ring: 38 92% 50%;
+
+    --positive: 142 72% 29%;          /* #15803d */
+    --negative: 0 72% 51%;            /* #dc2626 */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
   }
 
   .dark {
-    --background: 222 47% 5%;
-    --foreground: 210 40% 98%;
-    --muted: 217 32% 15%;
-    --muted-foreground: 215 20% 68%;
-    --border: 217 32% 20%;
-    --input: 217 32% 20%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
+    --background: 60 3% 8%;           /* #141413 */
+    --foreground: 60 3% 93%;          /* #ededec */
+    --card: 60 2% 10%;                /* #1a1a19 */
+    --card-foreground: 60 3% 93%;
+    --popover: 60 2% 11%;
+    --popover-foreground: 60 3% 93%;
+
+    --muted: 60 1% 14%;               /* #232322 */
+    --muted-foreground: 36 5% 64%;    /* #a8a49e */
+    --faint: 38 4% 52%;               /* #8a867f */
+    --accent: 60 1% 14%;
+    --accent-foreground: 60 3% 93%;
+    --secondary: 60 1% 14%;
+    --secondary-foreground: 60 3% 93%;
+
+    --border: 60 2% 17%;
+    --input: 60 2% 23%;
+
     --primary: 38 92% 50%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 217 32% 15%;
-    --secondary-foreground: 210 40% 98%;
-    --accent: 217 32% 15%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 42%;
-    --destructive-foreground: 210 40% 98%;
+    --primary-foreground: 40 6% 10%;
+    --brand-ink: 43 96% 56%;          /* amber-400 */
+    --ring: 38 92% 50%;
+
+    --positive: 151 49% 53%;          /* #4cc38a */
+    --negative: 358 75% 59%;          /* #e5484d */
+    --destructive: 358 75% 59%;
+    --destructive-foreground: 0 0% 100%;
   }
 
   * {
     @apply border-border;
+  }
+
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -57,17 +91,44 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Chrome pads date fields internally, making them taller than text inputs */
+  input[type="date"]::-webkit-datetime-edit,
+  input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /*
+   * Signature: the accountant's double rule under a final total.
+   * Used only beneath the figure that closes an account (total due, net
+   * receivable, closing balance), never as decoration.
+   */
+  .double-rule {
+    padding-bottom: 3px;
+    border-bottom: 3px double currentColor;
+  }
 }
 
 @layer utilities {
+  /* One entrance per page: a short fade and rise */
   .animate-in-up {
-    animation: slideInUp 0.2s ease-out;
+    animation: slideInUp 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   @keyframes slideInUp {
     from {
       opacity: 0;
-      transform: translateY(8px);
+      transform: translateY(6px);
     }
     to {
       opacity: 1;
@@ -76,11 +137,18 @@
   }
 
   .animate-fade-in {
-    animation: fadeIn 0.15s ease-out;
+    animation: fadeIn 0.16s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-in-up,
+    .animate-fade-in {
+      animation: none;
+    }
   }
 }
