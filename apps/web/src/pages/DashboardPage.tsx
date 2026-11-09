@@ -1,16 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
-import { DollarSign, TrendingUp, Clock, AlertCircle, FileText } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+import { AlertCircle, ArrowRight, FileText, Plus } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
-import { useSession } from "@/lib/auth-client";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { EmptyState, Page, PageHeader, Panel, PanelHeader, Skeleton, TableSkeleton } from "@/components/ui/layout";
+import { Money } from "@/components/ui/money";
+import { StatusBadge } from "@/components/ui/status";
+import { Table, THead, Th, Td, Tr } from "@/components/ui/table";
+
+interface CurrencyTotals {
+  currency: string;
+  invoiced: number;
+  collected: number;
+  outstanding: number;
+}
 
 interface DashboardStats {
-  totalInvoiced: number;
-  totalPaid: number;
-  totalOutstanding: number;
   overdueCount: number;
   totalPaidNPR: number;
+  totalOutstandingNPR: number;
+  totalInvoicedNPR: number;
+  byCurrency: CurrencyTotals[];
   nprRates: Record<string, number>;
   recentInvoices: {
     id: string;
@@ -23,264 +34,282 @@ interface DashboardStats {
   }[];
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-muted text-muted-foreground",
-  SENT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  PAID: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  OVERDUE: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Draft",
-  SENT: "Sent",
-  PAID: "Paid",
-  OVERDUE: "Overdue",
-};
-
-function greeting(name: string) {
-  const hour = new Date().getHours();
-  const salutation =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const first = name.split(" ")[0];
-  return `${salutation}, ${first}`;
+function Stat({
+  label,
+  value,
+  detail,
+  emphasis,
+  to,
+  className,
+}: {
+  className?: string;
+  label: string;
+  value: React.ReactNode;
+  detail?: React.ReactNode;
+  emphasis?: boolean;
+  to?: string;
+}) {
+  const body = (
+    <>
+      <p className="text-[13px] text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          "mt-2 text-2xl font-medium tracking-[-0.01em] tabular-nums text-foreground sm:text-[28px] sm:leading-9",
+          emphasis && "text-brand-ink"
+        )}
+      >
+        {value}
+      </p>
+      {detail && <div className="mt-1.5 text-xs text-faint">{detail}</div>}
+    </>
+  );
+  const cls = cn("block min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5", className);
+  return to ? (
+    <Link to={to} className={cn(cls, "transition-colors hover:border-input hover:bg-muted/30")}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
 }
 
 function StatSkeleton() {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 sm:p-5">
-      <div className="flex items-center justify-between sm:justify-start sm:gap-3">
-        <div className="h-8 w-8 animate-pulse rounded-lg bg-muted" />
-        <div className="h-3 w-16 animate-pulse rounded bg-muted sm:hidden" />
-      </div>
-      <div className="mt-2 h-3 w-16 animate-pulse rounded bg-muted hidden sm:block" />
-      <div className="mt-1.5 h-6 w-20 animate-pulse rounded bg-muted" />
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="mt-3 h-8 w-36" />
+      <Skeleton className="mt-2 h-3 w-28" />
     </div>
   );
 }
 
+/** Lists each currency's amount for a stat, e.g. "$3,200.00 · £1,850.00" */
+function PerCurrency({ rows, field }: { rows: CurrencyTotals[]; field: "collected" | "outstanding" }) {
+  const nonZero = rows.filter((r) => r[field] > 0);
+  if (nonZero.length === 0) return <span>Nothing yet</span>;
+  return (
+    <span className="tabular-nums">
+      {nonZero.map((r, i) => (
+        <span key={r.currency}>
+          {i > 0 && <span className="px-1">·</span>}
+          {formatCurrency(r[field], r.currency)}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const navigate = useNavigate();
   const { data, isLoading, isError } = useQuery<DashboardStats>({
     queryKey: ["dashboard-stats"],
     queryFn: () => api.get("/api/dashboard/stats"),
   });
 
-  const stats = [
-    {
-      label: "Invoiced",
-      value: data ? formatCurrency(data.totalInvoiced, "USD") : "—",
-      icon: DollarSign,
-      color: "text-brand",
-      bg: "bg-brand/10",
-    },
-    {
-      label: "Collected",
-      value: data ? formatCurrency(data.totalPaid, "USD") : "—",
-      sub: data?.totalPaidNPR
-        ? `≈ ${formatCurrency(data.totalPaidNPR, "NPR")}`
-        : undefined,
-      icon: TrendingUp,
-      color: "text-green-600 dark:text-green-400",
-      bg: "bg-green-100 dark:bg-green-900/20",
-    },
-    {
-      label: "Outstanding",
-      value: data ? formatCurrency(data.totalOutstanding, "USD") : "—",
-      icon: Clock,
-      color: "text-blue-600 dark:text-blue-400",
-      bg: "bg-blue-100 dark:bg-blue-900/20",
-    },
-    {
-      label: "Overdue",
-      value: data ? String(data.overdueCount) : "—",
-      icon: AlertCircle,
-      color: data?.overdueCount ? "text-red-600 dark:text-red-400" : "text-muted-foreground",
-      bg: data?.overdueCount ? "bg-red-100 dark:bg-red-900/20" : "bg-muted",
-    },
-  ];
+  const rows = data?.byCurrency ?? [];
+  // NPR totals are only meaningful when every foreign currency has a rate
+  const ratesMissing = rows.some((r) => r.currency !== "NPR" && !data?.nprRates[r.currency]);
+  const npr = (amount: number) => (ratesMissing ? "—" : formatCurrency(amount, "NPR"));
 
   return (
-    <div className="p-4 sm:p-8 animate-in-up">
-      {/* Header — button always pinned right */}
-      <div className="mb-5 sm:mb-8 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold text-foreground sm:text-2xl">
-            {session?.user.name ? greeting(session.user.name) : "Dashboard"}
-          </h1>
-          <p className="mt-0.5 hidden text-sm text-muted-foreground sm:block">
-            Here's what's happening with your invoices
-          </p>
-        </div>
-        <Link
-          to="/invoices/new"
-          className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition-all duration-150 hover:bg-brand-600 active:scale-[0.98]"
-        >
-          <FileText size={14} />
-          <span className="hidden xs:inline sm:inline">New invoice</span>
-          <span className="xs:hidden sm:hidden">New</span>
-        </Link>
-      </div>
-
-      {/* Error state */}
-      {isError && (
-        <div className="mb-5 flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertCircle size={16} className="shrink-0" />
-          Failed to load dashboard data. Please refresh to try again.
-        </div>
-      )}
-
-      {/* Stats cards — 2×2 on mobile, 4 across on desktop */}
-      <div className="mb-5 sm:mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {isLoading
-          ? Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)
-          : stats.map(({ label, value, sub, icon: Icon, color, bg }) => (
-              <div
-                key={label}
-                className="flex flex-col rounded-lg border border-border bg-card p-3 transition-shadow duration-150 hover:shadow-sm sm:p-5"
-              >
-                {/* Icon + label row */}
-                <div className="flex items-center gap-2">
-                  <div className={`rounded-md p-1.5 sm:p-2 ${bg}`}>
-                    <Icon size={14} className={`${color} sm:h-4 sm:w-4`} />
-                  </div>
-                  <p className="text-xs font-medium text-muted-foreground sm:text-sm">{label}</p>
-                </div>
-                {/* Value */}
-                <p className="mt-2 text-base font-semibold text-foreground sm:mt-3 sm:text-2xl">
-                  {value}
-                </p>
-                {/* Sub (NPR equivalent) — hidden on mobile, shown on desktop */}
-                {sub && (
-                  <p className="mt-0.5 hidden text-xs text-muted-foreground sm:block">{sub}</p>
-                )}
-              </div>
-            ))}
-      </div>
-
-      {/* NPR rates strip */}
-      {data?.nprRates && Object.keys(data.nprRates).length > 0 && (
-        <div className="mb-5 sm:mb-8 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-border bg-card px-4 py-2.5">
-          <span className="text-xs font-medium text-muted-foreground">Today's rates:</span>
-          {Object.entries(data.nprRates).map(([currency, rate]) => (
-            <span key={currency} className="text-xs text-foreground">
-              1 {currency}{" "}
-              <span className="font-semibold text-brand">= ₨{rate.toFixed(2)}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Recent invoices */}
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 sm:py-4">
-          <h2 className="text-sm font-medium text-foreground sm:text-base">Recent Invoices</h2>
-          <Link
-            to="/invoices"
-            className="text-xs text-muted-foreground transition-colors hover:text-brand"
-          >
-            View all →
+    <Page>
+      <PageHeader
+        title="Dashboard"
+        description="All invoices to date, converted to NPR at today's rates"
+        actions={
+          <Link to="/invoices/new" className={buttonVariants({ variant: "primary" })}>
+            <Plus size={16} />
+            New invoice
           </Link>
-        </div>
+        }
+      />
 
+      {isError && (
+        <div
+          role="alert"
+          className="mb-6 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          <AlertCircle size={16} className="shrink-0" />
+          Couldn't load the dashboard. Refresh to try again.
+        </div>
+      )}
+
+      {/* Figures: what's owed leads, then what's in, then what needs chasing */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-[1.4fr_1fr_0.8fr]">
         {isLoading ? (
-          <div className="space-y-3 p-4 sm:p-6">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-muted" />
-            ))}
-          </div>
-        ) : !data?.recentInvoices.length ? (
-          <div className="flex flex-col items-center py-10 sm:py-14">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <FileText size={20} className="text-muted-foreground" />
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className={i === 0 ? "col-span-2 lg:col-span-1" : undefined}>
+              <StatSkeleton />
             </div>
-            <p className="text-sm font-medium text-foreground">No invoices yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Create your first invoice to get started
-            </p>
-            <Link
-              to="/invoices/new"
-              className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
-            >
-              Create invoice
-            </Link>
-          </div>
+          ))
         ) : (
           <>
-            {/* Mobile card list */}
-            <ul className="divide-y divide-border sm:hidden">
-              {data.recentInvoices.map((inv) => (
-                <li key={inv.id}>
-                  <Link
-                    to={`/invoices/${inv.id}`}
-                    className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-accent/50"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">{inv.number}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[inv.status] ?? ""}`}>
-                          {STATUS_LABEL[inv.status] ?? inv.status}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{inv.clientName}</p>
-                    </div>
-                    <span className="ml-3 shrink-0 text-sm font-semibold text-foreground">
-                      {formatCurrency(inv.total, inv.currency)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-
-            {/* Desktop table */}
-            <div className="hidden overflow-x-auto sm:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="px-6 py-3 font-medium">Invoice</th>
-                    <th className="px-6 py-3 font-medium">Client</th>
-                    <th className="px-6 py-3 font-medium">Status</th>
-                    <th className="px-6 py-3 font-medium">Due</th>
-                    <th className="px-6 py-3 text-right font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentInvoices.map((inv) => (
-                    <tr
-                      key={inv.id}
-                      className="border-b border-border last:border-0 transition-colors duration-100 hover:bg-accent/50"
-                    >
-                      <td className="px-6 py-3 font-medium text-foreground">
-                        <Link
-                          to={`/invoices/${inv.id}`}
-                          className="hover:text-brand hover:underline"
-                        >
-                          {inv.number}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-3 text-muted-foreground">{inv.clientName}</td>
-                      <td className="px-6 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[inv.status] ?? ""}`}>
-                          {STATUS_LABEL[inv.status] ?? inv.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-muted-foreground">
-                        {new Date(inv.dueDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="px-6 py-3 text-right font-medium text-foreground">
-                        {formatCurrency(inv.total, inv.currency)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Stat
+              className="col-span-2 lg:col-span-1"
+              label="Outstanding"
+              emphasis
+              value={npr(data?.totalOutstandingNPR ?? 0)}
+              detail={<PerCurrency rows={rows} field="outstanding" />}
+            />
+            <Stat
+              label="Collected"
+              value={npr(data?.totalPaidNPR ?? 0)}
+              detail={<PerCurrency rows={rows} field="collected" />}
+            />
+            <Stat
+              label="Overdue"
+              value={data?.overdueCount ?? 0}
+              to={data?.overdueCount ? "/invoices?status=OVERDUE" : undefined}
+              detail={
+                data?.overdueCount ? (
+                  <span className="inline-flex items-center gap-1 text-negative">
+                    {data.overdueCount === 1 ? "1 invoice past due" : `${data.overdueCount} invoices past due`}
+                    <ArrowRight size={12} />
+                  </span>
+                ) : (
+                  "Nothing past due"
+                )
+              }
+            />
           </>
         )}
       </div>
-    </div>
+      {ratesMissing && !isLoading && (
+        <p className="mt-2 text-xs text-faint">
+          Today's exchange rates are unavailable, so NPR totals are hidden. Per-currency amounts are exact.
+        </p>
+      )}
+
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Recent invoices */}
+        <Panel className="self-start">
+          <PanelHeader
+            title="Recent invoices"
+            actions={
+              <Link
+                to="/invoices"
+                className="inline-flex items-center gap-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                All invoices
+                <ArrowRight size={13} />
+              </Link>
+            }
+          />
+          {isLoading ? (
+            <TableSkeleton rows={5} />
+          ) : !data?.recentInvoices.length ? (
+            <EmptyState
+              icon={FileText}
+              title="No invoices yet"
+              description="Bill a client in USD, GBP, EUR or NPR. Totals here update as invoices are sent and paid."
+              action={
+                <Link to="/invoices/new" className={buttonVariants({ variant: "primary" })}>
+                  New invoice
+                </Link>
+              }
+            />
+          ) : (
+            <>
+              {/* Mobile list */}
+              <ul className="divide-y divide-border sm:hidden">
+                {data.recentInvoices.map((inv) => (
+                  <li key={inv.id}>
+                    <Link
+                      to={`/invoices/${inv.id}`}
+                      className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-foreground">{inv.clientName}</p>
+                        <p className="mt-0.5 text-xs text-faint">
+                          {inv.number} · due {formatDate(inv.dueDate)}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <Money amount={inv.total} currency={inv.currency} className="text-sm font-medium text-foreground" />
+                        <StatusBadge status={inv.status} className="mt-0.5 flex justify-end text-xs" />
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Desktop table */}
+              <div className="hidden sm:block">
+                <Table>
+                  <THead>
+                    <Th>Invoice</Th>
+                    <Th>Client</Th>
+                    <Th>Status</Th>
+                    <Th>Due</Th>
+                    <Th align="right">Amount</Th>
+                  </THead>
+                  <tbody>
+                    {data.recentInvoices.map((inv) => (
+                      <Tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}>
+                        <Td className="text-foreground">
+                          <Link to={`/invoices/${inv.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                            {inv.number}
+                          </Link>
+                        </Td>
+                        <Td className="max-w-[220px] truncate">{inv.clientName}</Td>
+                        <Td>
+                          <StatusBadge status={inv.status} />
+                        </Td>
+                        <Td className="whitespace-nowrap">{formatDate(inv.dueDate)}</Td>
+                        <Td align="right" className="font-medium text-foreground">
+                          <Money amount={inv.total} currency={inv.currency} />
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            </>
+          )}
+        </Panel>
+
+        {/* The ledger by currency, with today's rate */}
+        <Panel className="self-start">
+          <PanelHeader title="By currency" description="Today's rates from open.er-api.com" />
+          {isLoading ? (
+            <TableSkeleton rows={3} />
+          ) : rows.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-faint">Totals appear after your first invoice</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {rows.map((r) => {
+                const rate = data?.nprRates[r.currency];
+                return (
+                  <li key={r.currency} className="px-4 py-3.5 sm:px-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm font-medium text-foreground">{r.currency}</span>
+                      <span className="text-xs text-faint">
+                        {r.currency === "NPR" ? "Base currency" : rate ? `1 ${r.currency} = ${formatCurrency(rate, "NPR")}` : "Rate unavailable"}
+                      </span>
+                    </div>
+                    <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                      {(
+                        [
+                          ["Invoiced", r.invoiced],
+                          ["Collected", r.collected],
+                          ["Outstanding", r.outstanding],
+                        ] as const
+                      ).map(([label, amount]) => (
+                        <div key={label} className="min-w-0">
+                          <dt className="text-faint">{label}</dt>
+                          <dd className="mt-0.5 truncate text-[13px] tabular-nums text-foreground">
+                            {formatCurrency(amount, r.currency)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
+      </div>
+    </Page>
   );
 }
