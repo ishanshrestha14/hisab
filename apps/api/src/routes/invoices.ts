@@ -6,6 +6,7 @@ import {
   updateInvoiceSchema,
   updateInvoiceStatusSchema,
   createPaymentSchema,
+  InvoiceStatusEnum,
 } from "@hisab/shared";
 import { getNPRRate } from "../lib/exchange-rate";
 import { eventBus } from "../lib/events";
@@ -26,24 +27,43 @@ const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
 
-// GET /api/invoices?page=1&limit=20
+// GET /api/invoices?page=1&limit=20&status=OVERDUE
+// `counts` covers every invoice the user has (not just this page or filter) so
+// status tabs can show accurate totals.
 invoices.get("/", async (c) => {
   const user = c.get("user");
   const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
   const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
 
-  const [data, total] = await Promise.all([
+  const statusParam = c.req.query("status");
+  const status = statusParam ? InvoiceStatusEnum.safeParse(statusParam) : undefined;
+  if (status && !status.success) return apiError(c, "BAD_REQUEST", `Unknown status "${statusParam}"`);
+
+  const where = status?.success ? { userId: user.id, status: status.data } : { userId: user.id };
+
+  const [data, total, byStatus] = await Promise.all([
     prisma.invoice.findMany({
-      where: { userId: user.id },
+      where,
       include: { client: { select: { name: true } }, lineItems: true },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
     }),
-    prisma.invoice.count({ where: { userId: user.id } }),
+    prisma.invoice.count({ where }),
+    prisma.invoice.groupBy({ by: ["status"], where: { userId: user.id }, _count: { _all: true } }),
   ]);
 
-  return c.json({ data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  const counts = { ALL: 0, DRAFT: 0, SENT: 0, PAID: 0, OVERDUE: 0 };
+  for (const row of byStatus) {
+    counts[row.status] = row._count._all;
+    counts.ALL += row._count._all;
+  }
+
+  return c.json({
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    counts,
+  });
 });
 
 // GET /api/invoices/:id

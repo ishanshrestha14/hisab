@@ -81,15 +81,57 @@ describe("GET /", () => {
     db.invoice.findMany.mockResolvedValue([]);
     db.invoice.count.mockResolvedValue(250);
 
+    db.invoice.groupBy.mockResolvedValue([]);
+
     const res = await app.request("/?page=3&limit=500");
 
     expect(await res.json()).toEqual({
       data: [],
       pagination: { page: 3, limit: 100, total: 250, totalPages: 3 },
+      counts: { ALL: 0, DRAFT: 0, SENT: 0, PAID: 0, OVERDUE: 0 },
     });
     expect(db.invoice.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: USER.id }, skip: 200, take: 100 })
     );
+  });
+
+  it("filters by status on the server so pagination covers every matching invoice", async () => {
+    db.invoice.findMany.mockResolvedValue([]);
+    db.invoice.count.mockResolvedValue(42);
+    db.invoice.groupBy.mockResolvedValue([]);
+
+    const res = await app.request("/?status=OVERDUE&page=2");
+
+    expect(res.status).toBe(200);
+    expect(db.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: USER.id, status: "OVERDUE" }, skip: 20 })
+    );
+    expect(db.invoice.count).toHaveBeenCalledWith({ where: { userId: USER.id, status: "OVERDUE" } });
+    expect(((await res.json()) as { pagination: unknown }).pagination).toEqual({ page: 2, limit: 20, total: 42, totalPages: 3 });
+  });
+
+  it("returns per-status counts across all pages, independent of the filter", async () => {
+    db.invoice.findMany.mockResolvedValue([]);
+    db.invoice.count.mockResolvedValue(3);
+    db.invoice.groupBy.mockResolvedValue([
+      { status: "SENT", _count: { _all: 3 } },
+      { status: "PAID", _count: { _all: 7 } },
+    ]);
+
+    const body = (await (await app.request("/?status=SENT")).json()) as { counts: unknown };
+
+    expect(body.counts).toEqual({ ALL: 10, DRAFT: 0, SENT: 3, PAID: 7, OVERDUE: 0 });
+    expect(db.invoice.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ by: ["status"], where: { userId: USER.id } })
+    );
+  });
+
+  it("rejects an unknown status", async () => {
+    const res = await app.request("/?status=LOST");
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("BAD_REQUEST");
+    expect(db.invoice.findMany).not.toHaveBeenCalled();
   });
 });
 
