@@ -6,6 +6,7 @@ import {
   updateInvoiceSchema,
   updateInvoiceStatusSchema,
   createPaymentSchema,
+  InvoiceStatusEnum,
 } from "@hisab/shared";
 import { getNPRRate } from "../lib/exchange-rate";
 import { eventBus } from "../lib/events";
@@ -19,31 +20,49 @@ import {
   lineItemTotal,
   paymentExceedsBalance,
   sumLineItems,
-  sumPayments,
 } from "../services/invoice-calc";
 
 const invoices = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
 
-// GET /api/invoices?page=1&limit=20
+// GET /api/invoices?page=1&limit=20&status=OVERDUE
+// `counts` covers every invoice the user has (not just this page or filter) so
+// status tabs can show accurate totals.
 invoices.get("/", async (c) => {
   const user = c.get("user");
   const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
   const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
 
-  const [data, total] = await Promise.all([
+  const statusParam = c.req.query("status");
+  const status = statusParam ? InvoiceStatusEnum.safeParse(statusParam) : undefined;
+  if (status && !status.success) return apiError(c, "BAD_REQUEST", `Unknown status "${statusParam}"`);
+
+  const where = status?.success ? { userId: user.id, status: status.data } : { userId: user.id };
+
+  const [data, total, byStatus] = await Promise.all([
     prisma.invoice.findMany({
-      where: { userId: user.id },
+      where,
       include: { client: { select: { name: true } }, lineItems: true },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
     }),
-    prisma.invoice.count({ where: { userId: user.id } }),
+    prisma.invoice.count({ where }),
+    prisma.invoice.groupBy({ by: ["status"], where: { userId: user.id }, _count: { _all: true } }),
   ]);
 
-  return c.json({ data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  const counts = { ALL: 0, DRAFT: 0, SENT: 0, PAID: 0, OVERDUE: 0 };
+  for (const row of byStatus) {
+    counts[row.status] = row._count._all;
+    counts.ALL += row._count._all;
+  }
+
+  return c.json({
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    counts,
+  });
 });
 
 // GET /api/invoices/:id
@@ -103,10 +122,10 @@ invoices.post("/:id/payments", zValidator("json", createPaymentSchema), async (c
   if (!invoice) return apiError(c, "NOT_FOUND", "Invoice not found");
   if (invoice.status === "DRAFT") return apiError(c, "BAD_REQUEST", "Cannot record payment on a draft invoice");
 
-  const total = sumLineItems(invoice.lineItems);
-  const alreadyPaid = sumPayments(invoice.payments);
-  if (paymentExceedsBalance(total, alreadyPaid, body.amount)) {
-    return apiError(c, "BAD_REQUEST", "Payment exceeds invoice total");
+  // Settle against the net receivable: withheld TDS never arrives as a payment
+  const { total, netReceivable, amountPaid: alreadyPaid } = computeInvoiceTotals(invoice);
+  if (paymentExceedsBalance(netReceivable, alreadyPaid, body.amount)) {
+    return apiError(c, "BAD_REQUEST", "Payment exceeds the balance due");
   }
 
   const payment = await prisma.payment.create({
@@ -120,7 +139,7 @@ invoices.post("/:id/payments", zValidator("json", createPaymentSchema), async (c
 
   // Auto-transition to PAID when fully paid
   let newStatus = invoice.status;
-  if (isFullyPaid(total, alreadyPaid + body.amount) && invoice.status !== "PAID") {
+  if (isFullyPaid(netReceivable, alreadyPaid + body.amount) && invoice.status !== "PAID") {
     await prisma.invoice.update({ where: { id }, data: { status: "PAID" } });
     newStatus = "PAID";
 
@@ -178,9 +197,9 @@ invoices.delete("/:id/payments/:paymentId", async (c) => {
       _sum: { amount: true },
     });
     const lineItems = await prisma.lineItem.findMany({ where: { invoiceId: id } });
-    const total = sumLineItems(lineItems);
+    const { netReceivable } = computeInvoiceTotals({ lineItems, tdsPercent: invoice.tdsPercent });
     const paid = remaining._sum.amount ?? 0;
-    if (!isFullyPaid(total, paid)) {
+    if (!isFullyPaid(netReceivable, paid)) {
       await prisma.invoice.update({ where: { id }, data: { status: "SENT" } });
     }
   }

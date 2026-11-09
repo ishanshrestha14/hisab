@@ -1,9 +1,14 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router";
-import { Plus, ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { Plus, FileText } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { Select } from "@/components/ui/field";
+import { EmptyState, Page, PageHeader, Panel, TableSkeleton } from "@/components/ui/layout";
+import { Money } from "@/components/ui/money";
+import { StatusBadge, statusLabel } from "@/components/ui/status";
+import { Pager, Table, THead, Th, Td, Tr } from "@/components/ui/table";
 
 interface Invoice {
   id: string;
@@ -28,212 +33,206 @@ const TABS: { label: string; value: FilterTab }[] = [
   { label: "All", value: "ALL" },
   { label: "Draft", value: "DRAFT" },
   { label: "Sent", value: "SENT" },
-  { label: "Paid", value: "PAID" },
   { label: "Overdue", value: "OVERDUE" },
+  { label: "Paid", value: "PAID" },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  DRAFT: "bg-muted text-muted-foreground",
-  SENT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  PAID: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  OVERDUE: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Draft",
-  SENT: "Sent",
-  PAID: "Paid",
-  OVERDUE: "Overdue",
-};
+const isTab = (v: string | null): v is FilterTab => TABS.some((t) => t.value === v);
 
 export default function InvoicesPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
-  const [page, setPage] = useState(1);
+  // Filter and page live in the URL so links like /invoices?status=OVERDUE work
+  const [params, setParams] = useSearchParams();
+  const statusParam = params.get("status");
+  const activeTab: FilterTab = isTab(statusParam) ? statusParam : "ALL";
+  const page = Math.max(1, Number(params.get("page")) || 1);
 
-  const { data, isLoading } = useQuery<{ data: Invoice[]; pagination: Pagination }>({
-    queryKey: ["invoices", page],
-    queryFn: () => api.get(`/api/invoices?page=${page}&limit=20`),
+  function update(next: { status?: FilterTab; page?: number }) {
+    const status = next.status ?? activeTab;
+    const p = next.page ?? 1;
+    const search = new URLSearchParams();
+    if (status !== "ALL") search.set("status", status);
+    if (p > 1) search.set("page", String(p));
+    setParams(search, { replace: true });
+  }
+
+  const query = new URLSearchParams({ page: String(page), limit: "20" });
+  if (activeTab !== "ALL") query.set("status", activeTab);
+
+  const { data, isLoading } = useQuery<{
+    data: Invoice[];
+    pagination: Pagination;
+    counts?: Record<FilterTab, number>;
+  }>({
+    queryKey: ["invoices", activeTab, page],
+    queryFn: () => api.get(`/api/invoices?${query}`),
+    placeholderData: keepPreviousData,
   });
 
   const invoices = data?.data ?? [];
   const pagination = data?.pagination;
-
-  const filtered =
-    activeTab === "ALL"
-      ? invoices
-      : invoices.filter((inv) => inv.status === activeTab);
+  const counts = data?.counts;
 
   return (
-    <div className="p-4 sm:p-8 animate-in-up">
-      <div className="mb-5 sm:mb-8 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage and track your invoices
-          </p>
-        </div>
-        <Link
-          to="/invoices/new"
-          className="flex shrink-0 cursor-pointer items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-white transition-all hover:bg-brand-600 active:scale-[0.98]"
-        >
-          <Plus size={16} />
-          <span className="hidden sm:inline">New invoice</span>
-          <span className="sm:hidden">New</span>
-        </Link>
-      </div>
+    <Page>
+      <PageHeader
+        title="Invoices"
+        actions={
+          <Link to="/invoices/new" className={buttonVariants({ variant: "primary" })}>
+            <Plus size={16} />
+            New invoice
+          </Link>
+        }
+      />
 
-      {/* Status filter — dropdown on mobile, tabs on desktop */}
+      {/* Status filter: select on mobile, tabs from sm up */}
       <div className="mb-4">
-        {/* Mobile dropdown */}
-        <select
-          className="sm:hidden rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/30"
+        <label className="sr-only" htmlFor="status-filter">
+          Status
+        </label>
+        <Select
+          id="status-filter"
+          className="w-auto sm:hidden"
           value={activeTab}
-          onChange={(e) => { setActiveTab(e.target.value as FilterTab); setPage(1); }}
+          onChange={(e) => update({ status: e.target.value as FilterTab })}
         >
           {TABS.map((tab) => (
-            <option key={tab.value} value={tab.value}>{tab.label}</option>
+            <option key={tab.value} value={tab.value}>
+              {tab.label}
+              {counts ? ` (${counts[tab.value]})` : ""}
+            </option>
           ))}
-        </select>
+        </Select>
 
-        {/* Desktop tabs */}
-        <div className="hidden sm:flex gap-0.5 border-b border-border">
+        <div role="tablist" aria-label="Filter by status" className="hidden gap-1 border-b border-border sm:flex">
           {TABS.map((tab) => {
-            const count =
-              tab.value === "ALL"
-                ? (pagination?.total ?? invoices.length)
-                : invoices.filter((inv) => inv.status === tab.value).length;
+            const active = activeTab === tab.value;
             return (
               <button
                 key={tab.value}
-                onClick={() => { setActiveTab(tab.value); setPage(1); }}
-                className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 -mb-px ${
-                  activeTab === tab.value
-                    ? "border-brand text-brand"
+                role="tab"
+                aria-selected={active}
+                onClick={() => update({ status: tab.value })}
+                className={cn(
+                  "-mb-px flex h-10 cursor-pointer items-center gap-2 border-b-2 px-3 text-sm transition-colors",
+                  active
+                    ? "border-brand font-medium text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
+                )}
               >
                 {tab.label}
-                <span className={`rounded-full px-1.5 py-0.5 text-xs transition-colors ${
-                  activeTab === tab.value ? "bg-brand/10 text-brand" : "bg-muted text-muted-foreground"
-                }`}>
-                  {count}
-                </span>
+                {counts && (
+                  <span className={cn("text-xs tabular-nums", active ? "text-muted-foreground" : "text-faint")}>
+                    {counts[tab.value]}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
+      <Panel>
         {isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-muted" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-14">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <FileText size={20} className="text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium text-foreground">
-              {activeTab === "ALL" ? "No invoices yet" : `No ${STATUS_LABEL[activeTab]?.toLowerCase()} invoices`}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {activeTab === "ALL"
-                ? "Create your first invoice to get started"
-                : `Invoices with "${STATUS_LABEL[activeTab]}" status will appear here`}
-            </p>
-            {activeTab === "ALL" && (
-              <Link
-                to="/invoices/new"
-                className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
-              >
-                Create invoice
-              </Link>
-            )}
-          </div>
+          <TableSkeleton rows={6} />
+        ) : invoices.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title={activeTab === "ALL" ? "No invoices yet" : `No ${statusLabel(activeTab).toLowerCase()} invoices`}
+            description={
+              activeTab === "ALL"
+                ? "Bill a client in USD, GBP, EUR or NPR and share a private payment link"
+                : undefined
+            }
+            action={
+              activeTab === "ALL" && (
+                <Link to="/invoices/new" className={buttonVariants({ variant: "primary" })}>
+                  New invoice
+                </Link>
+              )
+            }
+          />
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="px-6 py-3 font-medium">Invoice</th>
-                <th className="px-6 py-3 font-medium">Client</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Due</th>
-                <th className="px-6 py-3 text-right font-medium">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((inv) => {
+          <>
+            {/* Mobile list */}
+            <ul className="divide-y divide-border sm:hidden">
+              {invoices.map((inv) => {
                 const total = inv.lineItems.reduce((sum, li) => sum + li.total, 0);
                 return (
-                  <tr
-                    key={inv.id}
-                    onClick={() => navigate(`/invoices/${inv.id}`)}
-                    className="cursor-pointer border-b border-border last:border-0 transition-colors duration-100 hover:bg-accent/50"
-                  >
-                    <td className="px-6 py-3 font-medium text-foreground">
-                      {inv.number}
-                    </td>
-                    <td className="px-6 py-3 text-muted-foreground">
-                      {inv.client.name}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[inv.status] ?? ""}`}
-                      >
-                        {STATUS_LABEL[inv.status] ?? inv.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-muted-foreground">
-                      {new Date(inv.dueDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-6 py-3 text-right font-medium text-foreground">
-                      {formatCurrency(total, inv.currency)}
-                    </td>
-                  </tr>
+                  <li key={inv.id}>
+                    <Link
+                      to={`/invoices/${inv.id}`}
+                      className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-foreground">{inv.client.name}</p>
+                        <p className="mt-0.5 text-xs text-faint">
+                          {inv.number} · due {formatDate(inv.dueDate)}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <Money amount={total} currency={inv.currency} className="text-sm font-medium text-foreground" />
+                        <StatusBadge status={inv.status} className="mt-0.5 flex justify-end text-xs" />
+                      </div>
+                    </Link>
+                  </li>
                 );
               })}
-            </tbody>
-          </table></div>
-        )}
-      </div>
+            </ul>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Showing {(page - 1) * pagination.limit + 1}–
-            {Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => p - 1)}
-              disabled={page === 1}
-              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Previous page"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="px-1">
-              Page {page} of {pagination.totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page === pagination.totalPages}
-              className="cursor-pointer rounded-md border border-border p-1.5 transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Next page"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+            {/* Desktop table */}
+            <div className="hidden sm:block">
+              <Table>
+                <THead>
+                  <Th>Invoice</Th>
+                  <Th>Client</Th>
+                  <Th>Status</Th>
+                  <Th>Due</Th>
+                  <Th align="right">Amount</Th>
+                </THead>
+                <tbody>
+                  {invoices.map((inv) => {
+                    const total = inv.lineItems.reduce((sum, li) => sum + li.total, 0);
+                    return (
+                      <Tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}>
+                        <Td className="text-foreground">
+                          <Link
+                            to={`/invoices/${inv.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:underline"
+                          >
+                            {inv.number}
+                          </Link>
+                        </Td>
+                        <Td className="max-w-[260px] truncate">{inv.client.name}</Td>
+                        <Td>
+                          <StatusBadge status={inv.status} />
+                        </Td>
+                        <Td className={cn("whitespace-nowrap", inv.status === "OVERDUE" && "text-negative")}>
+                          {formatDate(inv.dueDate)}
+                        </Td>
+                        <Td align="right" className="font-medium text-foreground">
+                          <Money amount={total} currency={inv.currency} />
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
+          </>
+        )}
+      </Panel>
+
+      {pagination && (
+        <Pager
+          page={page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          limit={pagination.limit}
+          onPage={(p) => update({ page: p })}
+        />
       )}
-    </div>
+    </Page>
   );
 }

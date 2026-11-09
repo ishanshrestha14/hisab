@@ -3,6 +3,17 @@
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
+// The API returns `{ error: { code, message } }` (see apps/api/src/lib/errors.ts);
+// some older paths return `{ error: "message" }`.
+function errorMessage(body: unknown): string {
+  const error = (body as { error?: unknown } | null)?.error;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+  return "Request failed";
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -14,8 +25,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error ?? "Request failed");
+    const body = await res.json().catch(() => null);
+    throw new Error(errorMessage(body));
   }
 
   return res.json();

@@ -74,7 +74,9 @@ portal.get("/:token", viewLimiter, async (c) => {
     brandColor: invoice.user.brandColor,
     logoUrl: invoice.user.logoUrl,
     client: invoice.client,
+    // Exactly what the invoice prints in its "From" block
     freelancer: {
+      name: invoice.user.name,
       email: invoice.user.email,
       pan: invoice.user.pan,
       vatNumber: invoice.user.vatNumber,

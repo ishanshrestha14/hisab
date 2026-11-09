@@ -34,9 +34,11 @@ reports.get("/fiscal-year", async (c) => {
     totalInvoiced:    number | null;
     totalPaid:        number | null;
     totalOutstanding: number | null;
+    tdsWithheld:      number | null;
   };
   type ClientRow = {
     clientId:      string;
+    currency:      string;
     clientName:    string;
     totalInvoiced: number | null;
     totalPaid:     number | null;
@@ -61,39 +63,69 @@ reports.get("/fiscal-year", async (c) => {
         AND i."issueDate" <= ${end}
     `,
 
-    // Breakdown by currency
+    // Breakdown by currency, computed per invoice so partial payments count.
+    // Collected = net receivable once PAID, otherwise payments received.
     prisma.$queryRaw<CurrencyRow[]>`
+      WITH inv AS (
+        SELECT
+          i.currency,
+          i.status,
+          (SELECT COALESCE(SUM(li.total), 0) FROM "LineItem" li WHERE li."invoiceId" = i.id) AS gross,
+          (SELECT COALESCE(SUM(p.amount), 0) FROM "Payment"  p  WHERE p."invoiceId"  = i.id) AS paid,
+          i."tdsPercent" / 100.0 AS tds
+        FROM "Invoice" i
+        WHERE i."userId"    = ${user.id}
+          AND i."issueDate" >= ${start}
+          AND i."issueDate" <= ${end}
+      )
       SELECT
-        i.currency,
-        SUM(li.total) FILTER (WHERE i.status IN ('DRAFT','SENT','PAID','OVERDUE')) AS "totalInvoiced",
-        SUM(li.total) FILTER (WHERE i.status = 'PAID')                             AS "totalPaid",
-        SUM(li.total) FILTER (WHERE i.status IN ('SENT','OVERDUE'))                AS "totalOutstanding"
-      FROM "Invoice" i
-      JOIN "LineItem" li ON li."invoiceId" = i.id
-      WHERE i."userId"    = ${user.id}
-        AND i."issueDate" >= ${start}
-        AND i."issueDate" <= ${end}
-      GROUP BY i.currency
+        currency,
+        SUM(gross) AS "totalInvoiced",
+        SUM(CASE
+              WHEN status = 'PAID'               THEN gross * (1 - tds)
+              WHEN status IN ('SENT','OVERDUE') THEN LEAST(paid, gross * (1 - tds))
+              ELSE 0
+            END) AS "totalPaid",
+        SUM(CASE
+              WHEN status IN ('SENT','OVERDUE') THEN GREATEST(gross * (1 - tds) - paid, 0)
+              ELSE 0
+            END) AS "totalOutstanding",
+        SUM(CASE WHEN status = 'PAID' THEN gross * tds ELSE 0 END) AS "tdsWithheld"
+      FROM inv
+      GROUP BY currency
       ORDER BY "totalInvoiced" DESC NULLS LAST
     `,
 
-    // Breakdown by client (top 20)
+    // Breakdown by client and currency; combined per client in NPR below
     prisma.$queryRaw<ClientRow[]>`
+      WITH inv AS (
+        SELECT
+          i.id,
+          i."clientId",
+          i.currency,
+          i.status,
+          (SELECT COALESCE(SUM(li.total), 0) FROM "LineItem" li WHERE li."invoiceId" = i.id) AS gross,
+          (SELECT COALESCE(SUM(p.amount), 0) FROM "Payment"  p  WHERE p."invoiceId"  = i.id) AS paid,
+          i."tdsPercent" / 100.0 AS tds
+        FROM "Invoice" i
+        WHERE i."userId"    = ${user.id}
+          AND i."issueDate" >= ${start}
+          AND i."issueDate" <= ${end}
+      )
       SELECT
-        i."clientId",
-        c.name                                                                         AS "clientName",
-        SUM(li.total) FILTER (WHERE i.status IN ('DRAFT','SENT','PAID','OVERDUE'))     AS "totalInvoiced",
-        SUM(li.total) FILTER (WHERE i.status = 'PAID')                                AS "totalPaid",
-        COUNT(DISTINCT i.id)                                                           AS "invoiceCount"
-      FROM "Invoice" i
-      JOIN "LineItem" li ON li."invoiceId" = i.id
-      JOIN "Client"   c  ON c.id = i."clientId"
-      WHERE i."userId"    = ${user.id}
-        AND i."issueDate" >= ${start}
-        AND i."issueDate" <= ${end}
-      GROUP BY i."clientId", c.name
-      ORDER BY "totalInvoiced" DESC NULLS LAST
-      LIMIT 20
+        inv."clientId",
+        c.name AS "clientName",
+        inv.currency,
+        SUM(gross) AS "totalInvoiced",
+        SUM(CASE
+              WHEN status = 'PAID'               THEN gross * (1 - tds)
+              WHEN status IN ('SENT','OVERDUE') THEN LEAST(paid, gross * (1 - tds))
+              ELSE 0
+            END) AS "totalPaid",
+        COUNT(*) AS "invoiceCount"
+      FROM inv
+      JOIN "Client" c ON c.id = inv."clientId"
+      GROUP BY inv."clientId", c.name, inv.currency
     `,
 
     // All fiscal years that have at least one invoice for this user
@@ -115,12 +147,53 @@ reports.get("/fiscal-year", async (c) => {
 
   const agg = summaryRows[0];
 
-  // NPR equivalent of amount collected in the FY
-  const totalPaidNPR = byCurrencyRows.reduce((sum, row) => {
-    const paid = Number(row.totalPaid ?? 0);
-    if (row.currency === "NPR") return sum + paid;
-    return sum + paid * (nprRates[row.currency as keyof typeof nprRates] ?? 0);
-  }, 0);
+  // Currencies are never added together directly: each is converted to NPR
+  // at today's rate first. The unconverted summary/byClient totals are kept
+  // only for older clients.
+  const toNPR = (currency: string, amount: number | null) =>
+    currency === "NPR"
+      ? Number(amount ?? 0)
+      : Number(amount ?? 0) * (nprRates[currency as keyof typeof nprRates] ?? 0);
+  const sumNPR = (field: "totalInvoiced" | "totalPaid" | "totalOutstanding" | "tdsWithheld") =>
+    byCurrencyRows.reduce((sum, row) => sum + toNPR(row.currency, row[field]), 0);
+  const totalPaidNPR = sumNPR("totalPaid");
+
+  // Fold client × currency rows into one row per client, ranked by NPR total
+  const clients = new Map<
+    string,
+    {
+      clientId: string;
+      clientName: string;
+      currencies: string[];
+      totalInvoiced: number;
+      totalPaid: number;
+      totalInvoicedNPR: number;
+      totalPaidNPR: number;
+      invoiceCount: number;
+    }
+  >();
+  for (const r of byClientRows) {
+    const row = clients.get(r.clientId) ?? {
+      clientId: r.clientId,
+      clientName: r.clientName,
+      currencies: [],
+      totalInvoiced: 0,
+      totalPaid: 0,
+      totalInvoicedNPR: 0,
+      totalPaidNPR: 0,
+      invoiceCount: 0,
+    };
+    row.currencies.push(r.currency);
+    row.totalInvoiced += Number(r.totalInvoiced ?? 0);
+    row.totalPaid += Number(r.totalPaid ?? 0);
+    row.totalInvoicedNPR += toNPR(r.currency, r.totalInvoiced);
+    row.totalPaidNPR += toNPR(r.currency, r.totalPaid);
+    row.invoiceCount += Number(r.invoiceCount);
+    clients.set(r.clientId, row);
+  }
+  const byClient = [...clients.values()]
+    .sort((a, b) => b.totalInvoicedNPR - a.totalInvoicedNPR)
+    .slice(0, 20);
 
   // Always include the current FY in the selector even if empty
   const fySet = new Set(availableFYsRaw.map((r) => Number(r.year)));
@@ -136,6 +209,9 @@ reports.get("/fiscal-year", async (c) => {
       totalPaid:        Number(agg?.totalPaid        ?? 0),
       totalOutstanding: Number(agg?.totalOutstanding ?? 0),
       totalPaidNPR,
+      totalInvoicedNPR:    sumNPR("totalInvoiced"),
+      totalOutstandingNPR: sumNPR("totalOutstanding"),
+      tdsWithheldNPR:      sumNPR("tdsWithheld"),
       invoiceCount:     Number(agg?.invoiceCount     ?? 0),
       paidCount:        Number(agg?.paidCount        ?? 0),
       tdsWithheld:      Number(agg?.tdsWithheld      ?? 0),
@@ -145,14 +221,9 @@ reports.get("/fiscal-year", async (c) => {
       totalInvoiced:    Number(r.totalInvoiced    ?? 0),
       totalPaid:        Number(r.totalPaid        ?? 0),
       totalOutstanding: Number(r.totalOutstanding ?? 0),
+      tdsWithheld:      Number(r.tdsWithheld      ?? 0),
     })),
-    byClient: byClientRows.map((r) => ({
-      clientId:      r.clientId,
-      clientName:    r.clientName,
-      totalInvoiced: Number(r.totalInvoiced ?? 0),
-      totalPaid:     Number(r.totalPaid     ?? 0),
-      invoiceCount:  Number(r.invoiceCount),
-    })),
+    byClient,
     availableFYs,
     nprRates,
   });

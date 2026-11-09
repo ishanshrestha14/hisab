@@ -11,7 +11,7 @@ import QuotesPage from "./pages/QuotesPage";
 import QuoteNewPage from "./pages/QuoteNewPage";
 import QuoteDetailPage from "./pages/QuoteDetailPage";
 import RecurringPage from "./pages/RecurringPage";
-import RecurringNewPage from "./pages/RecurringNewPage";
+import RecurringFormPage from "./pages/RecurringFormPage";
 import ExpensesPage from "./pages/ExpensesPage";
 import TimePage from "./pages/TimePage";
 import ReportsPage from "./pages/ReportsPage";
@@ -26,8 +26,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (isPending) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent" />
+      <div className="flex h-screen items-center justify-center text-faint" aria-label="Loading">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       </div>
     );
   }
@@ -67,7 +67,8 @@ export default function App() {
         <Route path="quotes/new" element={<QuoteNewPage />} />
         <Route path="quotes/:id" element={<QuoteDetailPage />} />
         <Route path="recurring" element={<RecurringPage />} />
-        <Route path="recurring/new" element={<RecurringNewPage />} />
+        <Route path="recurring/new" element={<RecurringFormPage />} />
+        <Route path="recurring/:id" element={<RecurringFormPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="time" element={<TimePage />} />
         <Route path="reports" element={<ReportsPage />} />

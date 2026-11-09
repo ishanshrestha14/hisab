@@ -81,15 +81,57 @@ describe("GET /", () => {
     db.invoice.findMany.mockResolvedValue([]);
     db.invoice.count.mockResolvedValue(250);
 
+    db.invoice.groupBy.mockResolvedValue([]);
+
     const res = await app.request("/?page=3&limit=500");
 
     expect(await res.json()).toEqual({
       data: [],
       pagination: { page: 3, limit: 100, total: 250, totalPages: 3 },
+      counts: { ALL: 0, DRAFT: 0, SENT: 0, PAID: 0, OVERDUE: 0 },
     });
     expect(db.invoice.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: USER.id }, skip: 200, take: 100 })
     );
+  });
+
+  it("filters by status on the server so pagination covers every matching invoice", async () => {
+    db.invoice.findMany.mockResolvedValue([]);
+    db.invoice.count.mockResolvedValue(42);
+    db.invoice.groupBy.mockResolvedValue([]);
+
+    const res = await app.request("/?status=OVERDUE&page=2");
+
+    expect(res.status).toBe(200);
+    expect(db.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: USER.id, status: "OVERDUE" }, skip: 20 })
+    );
+    expect(db.invoice.count).toHaveBeenCalledWith({ where: { userId: USER.id, status: "OVERDUE" } });
+    expect(((await res.json()) as { pagination: unknown }).pagination).toEqual({ page: 2, limit: 20, total: 42, totalPages: 3 });
+  });
+
+  it("returns per-status counts across all pages, independent of the filter", async () => {
+    db.invoice.findMany.mockResolvedValue([]);
+    db.invoice.count.mockResolvedValue(3);
+    db.invoice.groupBy.mockResolvedValue([
+      { status: "SENT", _count: { _all: 3 } },
+      { status: "PAID", _count: { _all: 7 } },
+    ]);
+
+    const body = (await (await app.request("/?status=SENT")).json()) as { counts: unknown };
+
+    expect(body.counts).toEqual({ ALL: 10, DRAFT: 0, SENT: 3, PAID: 7, OVERDUE: 0 });
+    expect(db.invoice.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ by: ["status"], where: { userId: USER.id } })
+    );
+  });
+
+  it("rejects an unknown status", async () => {
+    const res = await app.request("/?status=LOST");
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("BAD_REQUEST");
+    expect(db.invoice.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -107,7 +149,7 @@ describe("GET /:id", () => {
       tdsAmount: 150,
       netReceivable: 850,
       amountPaid: 250,
-      amountDue: 750,
+      amountDue: 600,
       nprRate: 140,
       nprTotal: 140_000,
     });
@@ -211,7 +253,7 @@ describe("POST /:id/payments", () => {
     const res = await app.request("/inv_1/payments", json("POST", { amount: 100.01 }));
 
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: { message: string } }).error.message).toBe("Payment exceeds invoice total");
+    expect(((await res.json()) as { error: { message: string } }).error.message).toBe("Payment exceeds the balance due");
     expect(db.payment.create).not.toHaveBeenCalled();
   });
 
@@ -243,6 +285,32 @@ describe("POST /:id/payments", () => {
   });
 });
 
+describe("POST /:id/payments with TDS", () => {
+  beforeEach(() => {
+    db.payment.create.mockImplementation(async ({ data }) => ({ id: "pay_1", ...data }));
+  });
+
+  it("marks a TDS invoice PAID when the client pays the net receivable", async () => {
+    // total 1000, 15% TDS withheld by the client → 850 arrives
+    db.invoice.findFirst.mockResolvedValue(invoiceRow({ tdsPercent: 15 }));
+
+    const res = await app.request("/inv_1/payments", json("POST", { amount: 850 }));
+
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { status: string }).status).toBe("PAID");
+    expect(db.invoice.update).toHaveBeenCalledWith({ where: { id: "inv_1" }, data: { status: "PAID" } });
+  });
+
+  it("refuses a payment above the net receivable", async () => {
+    db.invoice.findFirst.mockResolvedValue(invoiceRow({ tdsPercent: 15 }));
+
+    const res = await app.request("/inv_1/payments", json("POST", { amount: 850.01 }));
+
+    expect(res.status).toBe(400);
+    expect(db.payment.create).not.toHaveBeenCalled();
+  });
+});
+
 describe("DELETE /:id/payments/:paymentId", () => {
   it("reverts a PAID invoice to SENT when it is no longer fully paid", async () => {
     db.invoice.findFirst.mockResolvedValue(invoiceRow({ status: "PAID" }));
@@ -255,6 +323,17 @@ describe("DELETE /:id/payments/:paymentId", () => {
     expect(res.status).toBe(200);
     expect(db.payment.delete).toHaveBeenCalledWith({ where: { id: "pay_1" } });
     expect(db.invoice.update).toHaveBeenCalledWith({ where: { id: "inv_1" }, data: { status: "SENT" } });
+  });
+
+  it("keeps a TDS invoice PAID while payments still cover the net receivable", async () => {
+    db.invoice.findFirst.mockResolvedValue(invoiceRow({ status: "PAID", tdsPercent: 15 }));
+    db.payment.findFirst.mockResolvedValue({ id: "pay_extra", amount: 50 });
+    db.payment.aggregate.mockResolvedValue({ _sum: { amount: 850 } });
+    db.lineItem.findMany.mockResolvedValue([{ total: 1000 }]);
+
+    await app.request("/inv_1/payments/pay_extra", { method: "DELETE" });
+
+    expect(db.invoice.update).not.toHaveBeenCalled();
   });
 
   it("only deletes payments that belong to the invoice", async () => {

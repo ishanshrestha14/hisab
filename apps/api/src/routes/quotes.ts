@@ -5,6 +5,7 @@ import {
   createQuoteSchema,
   updateQuoteSchema,
   updateQuoteStatusSchema,
+  QuoteStatusEnum,
 } from "@hisab/shared";
 import { apiError } from "../lib/errors";
 import { audit } from "../lib/audit";
@@ -16,24 +17,42 @@ const quotes = new Hono<{
   Variables: { user: { id: string; email: string; name: string } };
 }>();
 
-// GET /api/quotes?page=1&limit=20
+// GET /api/quotes?page=1&limit=20&status=SENT
+// `counts` covers every quote the user has, for the status tabs.
 quotes.get("/", async (c) => {
   const user = c.get("user");
   const page = Math.max(1, parseInt(c.req.query("page") ?? "1"));
   const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20")));
 
-  const [data, total] = await Promise.all([
+  const statusParam = c.req.query("status");
+  const status = statusParam ? QuoteStatusEnum.safeParse(statusParam) : undefined;
+  if (status && !status.success) return apiError(c, "BAD_REQUEST", `Unknown status "${statusParam}"`);
+
+  const where = status?.success ? { userId: user.id, status: status.data } : { userId: user.id };
+
+  const [data, total, byStatus] = await Promise.all([
     prisma.quote.findMany({
-      where: { userId: user.id },
+      where,
       include: { client: { select: { name: true } }, lineItems: true },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
     }),
-    prisma.quote.count({ where: { userId: user.id } }),
+    prisma.quote.count({ where }),
+    prisma.quote.groupBy({ by: ["status"], where: { userId: user.id }, _count: { _all: true } }),
   ]);
 
-  return c.json({ data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  const counts = { ALL: 0, DRAFT: 0, SENT: 0, ACCEPTED: 0, DECLINED: 0, CONVERTED: 0 };
+  for (const row of byStatus) {
+    counts[row.status] = row._count._all;
+    counts.ALL += row._count._all;
+  }
+
+  return c.json({
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    counts,
+  });
 });
 
 // GET /api/quotes/:id

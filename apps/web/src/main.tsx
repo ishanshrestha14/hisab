@@ -24,10 +24,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           position="bottom-right"
           toastOptions={{
             classNames: {
-              toast: "font-sans text-sm",
+              toast:
+                "font-sans text-sm !rounded-xl !border-border !bg-popover !text-foreground !shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
+              description: "!text-muted-foreground",
+              success: "[&_[data-icon]]:!text-positive",
+              error: "[&_[data-icon]]:!text-negative",
             },
           }}
-          richColors
         />
       </BrowserRouter>
     </QueryClientProvider>

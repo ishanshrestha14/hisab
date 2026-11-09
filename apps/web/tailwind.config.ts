@@ -43,8 +43,13 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Brand amber — used as primary accent throughout
+        // Text roles beyond foreground / muted-foreground
+        faint: "hsl(var(--faint))",
+        positive: "hsl(var(--positive))",
+        negative: "hsl(var(--negative))",
+        // Brand amber — the accent. `brand-ink` is amber dark enough to read as text.
         brand: {
+          ink: "hsl(var(--brand-ink))",
           DEFAULT: "#f59e0b",
           50: "#fffbeb",
           100: "#fef3c7",
@@ -57,6 +62,13 @@ const config: Config = {
           800: "#92400e",
           900: "#78350f",
         },
+      },
+      // One easing curve for every transition
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+      transitionDuration: {
+        DEFAULT: "150ms",
       },
       // shadcn/ui CSS variable mappings
       borderRadius: {
