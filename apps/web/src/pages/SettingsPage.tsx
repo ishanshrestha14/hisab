@@ -164,7 +164,7 @@ function ComingSoonBadge() {
 
 export default function SettingsPage() {
   const { data: session, refetch } = useSession();
-  const { theme, toggle } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [saved, setSaved] = useState(false);
   const [taxSaved, setTaxSaved] = useState(false);
   const queryClient = useQueryClient();
@@ -346,7 +346,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 gap-3 max-w-sm">
               {/* Light option */}
               <button
-                onClick={() => theme === "dark" && toggle()}
+                onClick={() => setTheme("light")}
                 className={cn(
                   "cursor-pointer rounded-xl border p-3 text-left transition-colors",
                   theme === "light"
@@ -365,7 +365,7 @@ export default function SettingsPage() {
 
               {/* Dark option */}
               <button
-                onClick={() => theme === "light" && toggle()}
+                onClick={() => setTheme("dark")}
                 className={cn(
                   "cursor-pointer rounded-xl border p-3 text-left transition-colors",
                   theme === "dark"
